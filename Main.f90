@@ -1,3 +1,35 @@
+! ============================================================
+! Program: FORGE
+! Authors: Tobias Stauber (lead developer)
+!          Miguel Sánchez Sánchez (co-lead developer)
+!          Igor Vasilevskiy (contributor)
+!          José Gonzázlez (contributor)
+!          José Carlos Mouriño Gallego (contributor)
+!          Martin Wackerl (contributor)
+!          Paul Wenk (contributor)
+!	   John Schliemann (contributor)
+!           
+! License: MIT
+! Description:
+!   FORGE is a scalable, self-consistent electronic structure toolkit designed for large-scale tight-binding models.
+!   It enables Hartree-Fock-level calculations in systems with very large or non-trivial unit cells using
+!   real-space methods, making it ideal for nanoscale quantum materials.
+!
+! Usage:
+!   Compile with: ifort -qopenmp -o forge.out LapackRoutines.f90 Setup.f90 Geometry.f90 TightBinding.f90
+!                 HartreeFock.f90 Main.f90 -qmkl -lpthread -lm
+!
+!   Set up: ulimit -s unlimited
+!           export OMP_NUM_THREADS=N
+!           export OMP_STACKSIZE=Xg ( for total memory X*N GByte )
+!
+!   Run with:     ./forge.out
+!
+! Repository:
+!   https://github.com/forge-team/
+!
+! Last updated: 2025-10-10
+! ============================================================
 
 program FORGE
 
