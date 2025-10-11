@@ -1084,12 +1084,13 @@ subroutine OptimalStep(Step,HartreeEnergy,FockEnergy,HubbardEnergy,KineticEnergy
     coeffs1 = 4.0*temp2 - temp1 - 3.0*coeffs0
     coeffs2 = temp1 - coeffs0 - coeffs1
 
+    ! chose 0<Step<=1 to minimize the energy (or StepAlternative if not possible)
     if((coeffs2.gt.0).and.(abs(-coeffs1/2.0_dp/coeffs2 - .5_dp).lt.0.5_dp))then
       Step = -coeffs1/2.0/coeffs2
     elseif(temp1.lt.coeffs0)then
       Step = 1.0_dp
     else
-      Step = 0.99_dp
+      Step = StepAlternative
     endif
 
     do nspin=1,numS

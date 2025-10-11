@@ -48,6 +48,7 @@ integer(dp), parameter :: nscreenIn = 2                       ! scr of initial g
 real(dp), parameter:: xiIn = 2.0_dp/0.246_dp              ! xi of initial guess
 
 real(dp), parameter :: EnergyTolerance=0.0001_dp         ! energies within tolerance are considered degenerate when computing the Fock matrix  
+real(dp), parameter :: StepAlternative = 1.0_dp          ! value of step when the ODA algo does not provide it (the energy increases for any value)
 integer(dp), parameter :: itmax = 2                      ! maximal number of iterations of the self-consistency loop  
 
 character(9) :: dirFock  = 'dataFock/'                                ! folder to output Fock matrix
