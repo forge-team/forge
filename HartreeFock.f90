@@ -117,19 +117,21 @@ subroutine HamiltonianHartreeFock(zH,Coords,Potential,alpha,Delta,zFock,nUnitCel
   end do
 
   ! Layer bias term
+  if(nlayers.GT.1)then
   do n1 = 0,nlayers-1
     do i=1,ndim/nlayers
       zH(i+ n1*ndim/nlayers,i+ n1*ndim/nlayers) = zH(i+ n1*ndim/nlayers,i+ n1*ndim/nlayers) + (n1 - real(nlayers-1)/2)*Delta/real(nlayers-1)
     enddo
   enddo
+  endif
 end subroutine HamiltonianHartreeFock
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 subroutine Solve_C3(zFockBulk,zFock,Potential,alpha,Bands,zEigenvectors,&
-  Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,tn,g1,g12,nC3pairs)
+  Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,RotateLayers,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,tn,g1,g12,nC3pairs)
 
-  integer(dp), intent(in)    :: ndim, numk, Nk, nLower, nUpper,numNeighborCells, nC3pairs(ndim)
+  integer(dp), intent(in)    :: ndim, numk, Nk, nLower, nUpper,numNeighborCells, nC3pairs(ndim), RotateLayers(nlayers)
   integer(dp), intent(in)    :: nMomentaComponents(Nk,2)
   integer(dp), intent(in)    :: nUnitCell_1(numNeighborCells),nUnitCell_2(numNeighborCells)
   real(dp)   , intent(in)    :: tn(2,3), MomentaValues(numk,numk,2), Coords(ndim,3),Potential(ndim), g1(2), g12(2)
@@ -139,7 +141,7 @@ subroutine Solve_C3(zFockBulk,zFock,Potential,alpha,Bands,zEigenvectors,&
   complex(dp), intent(out) :: zEigenvectors(ndim,nUpper-nLower+1,Nk),zFockBulk(ndim,ndim,numNeighborCells)
 
   integer(dp) :: ivk1, ivk2, ivk1c3, ivk2c3, icount, icountk, nband, C3_RelatedMomenta(Nk,3)
-  integer(dp) :: n1,n2,iUnitCell,i, NkMod_C3, NkWith_C3, MomentaMod_C3(2*Nk), MomentaIncl_C3(2*Nk), flg(1)
+  integer(dp) :: n1,n2,nlayer,iUnitCell,i, NkMod_C3, NkWith_C3, MomentaMod_C3(2*Nk), MomentaIncl_C3(2*Nk), flg(1)
   real(dp)    :: Energies(ndim), vk(2), vk3(2)
   complex(dp) :: zH_FockBulk1Temp(ndim,ndim)
   complex(dp) :: zP(ndim,1)
@@ -187,7 +189,7 @@ subroutine Solve_C3(zFockBulk,zFock,Potential,alpha,Bands,zEigenvectors,&
 
   zFockBulk=cmplx(0.0_dp,0.0_dp,dp)
   !$omp parallel do &
-  !$omp private(icount,icountk,vk,vk3,ivk1,ivk2,ivk1c3,ivk2c3,nband,zH_FockBulk1Temp,Energies,zP,zphase,iUnitCell,n1,n2,i) &
+  !$omp private(icount,icountk,vk,vk3,ivk1,ivk2,ivk1c3,ivk2c3,nlayer,nband,zH_FockBulk1Temp,Energies,zP,zphase,iUnitCell,n1,n2,i) &
   !$omp private(zFockBulkTemp) &
   !$omp shared(Coords,Nk,MomentaMod_C3,tn,nLower,nUpper,Bands,zEigenvectors,nUnitCell_1,nUnitCell_2,numNeighborCells,nC3pairs,g1,g12) &
   !$omp shared(nMomentaComponents,MomentaValues,zFock) &
@@ -225,10 +227,15 @@ subroutine Solve_C3(zFockBulk,zFock,Potential,alpha,Bands,zEigenvectors,&
           ivk1c3 = nMomentaComponents(C3_RelatedMomenta(icountk,2),1)
           ivk2c3 = nMomentaComponents(C3_RelatedMomenta(icountk,2),2)
           zphase(:) = cmplx(1.0_dp,0.0_dp,dp)
-          zphase(ndim/4*1) = exp(cmplx(0.0_dp,-2*pi*real(ivk1c3+ivk2c3,dp)/real(numk,dp),dp))
-          zphase(ndim/4*2) = exp(cmplx(0.0_dp,2*pi*real(ivk1c3+ivk2c3,dp)/real(numk,dp),dp))
-          zphase(ndim/4*3) = exp(cmplx(0.0_dp,2*pi*real(ivk1c3+ivk2c3,dp)/real(numk,dp),dp))
-          zphase(ndim/4*4) = exp(cmplx(0.0_dp,-2*pi*real(ivk1c3+ivk2c3,dp)/real(numk,dp),dp))
+          do nlayer=1,nlayers
+            if(RotateLayers(nlayer).eq.-1)then
+              zphase(ndim/nlayers*(nlayer-1) + ndim/nlayers/2) = exp(cmplx(0.0_dp,-2*pi*real(ivk1c3+ivk2c3,dp)/real(numk,dp),dp))
+              zphase(ndim/nlayers*(nlayer-1) + ndim/nlayers) = exp(cmplx(0.0_dp,2*pi*real(ivk1c3+ivk2c3,dp)/real(numk,dp),dp))
+            else if (RotateLayers(nlayer).eq.1)then
+              zphase(ndim/nlayers*(nlayer-1) + ndim/nlayers/2) = exp(cmplx(0.0_dp,2*pi*real(ivk1c3+ivk2c3,dp)/real(numk,dp),dp))
+              zphase(ndim/nlayers*(nlayer-1) + ndim/nlayers) = exp(cmplx(0.0_dp,-2*pi*real(ivk1c3+ivk2c3,dp)/real(numk,dp),dp))         
+            endif
+          enddo
 
         elseif(fphase.eq.1)then
           vk3 = real(-ivk1-ivk2 - modulo(-ivk1-ivk2,numk),dp)/real(numk,dp)*g1 +&
@@ -246,10 +253,15 @@ subroutine Solve_C3(zFockBulk,zFock,Potential,alpha,Bands,zEigenvectors,&
           ivk1c3 = nMomentaComponents(C3_RelatedMomenta(icountk,3),1)
           ivk2c3 = nMomentaComponents(C3_RelatedMomenta(icountk,3),2)
           zphase(:) = cmplx(1.0_dp,0.0_dp,dp)
-          zphase(ndim/4*1) = exp(cmplx(0.0_dp,-2*pi*real(ivk2c3,dp)/real(numk,dp),dp))
-          zphase(ndim/4*2) = exp(cmplx(0.0_dp,2*pi*real(ivk2c3,dp)/real(numk,dp),dp))
-          zphase(ndim/4*3) = exp(cmplx(0.0_dp,2*pi*real(ivk2c3,dp)/real(numk,dp),dp))
-          zphase(ndim/4*4) = exp(cmplx(0.0_dp,-2*pi*real(ivk2c3,dp)/real(numk,dp),dp))
+          do nlayer=1,nlayers
+            if(RotateLayers(nlayer).eq.-1)then
+              zphase(ndim/nlayers*(nlayer-1) + ndim/nlayers/2) = exp(cmplx(0.0_dp,-2*pi*real(ivk2c3,dp)/real(numk,dp),dp))
+              zphase(ndim/nlayers*(nlayer-1) + ndim/nlayers) = exp(cmplx(0.0_dp,2*pi*real(ivk2c3,dp)/real(numk,dp),dp))
+            else if (RotateLayers(nlayer).eq.1)then
+              zphase(ndim/nlayers*(nlayer-1) + ndim/nlayers/2) = exp(cmplx(0.0_dp,2*pi*real(ivk2c3,dp)/real(numk,dp),dp))
+              zphase(ndim/nlayers*(nlayer-1) + ndim/nlayers) = exp(cmplx(0.0_dp,-2*pi*real(ivk2c3,dp)/real(numk,dp),dp))         
+            endif
+          enddo
 
         elseif(fphase.eq.1)then
           vk3 = real(ivk2 - modulo(ivk2,numk),dp)/real(numk,dp)*g1 +&
@@ -290,15 +302,32 @@ subroutine Solve_C3(zFockBulk,zFock,Potential,alpha,Bands,zEigenvectors,&
     ! Apply C_3 to zFockBulkTemp(:,:,1), obtain the full C_3-tranformed zFockBulkTemp and add the contribution
     ! The points at the corners (ndim/4*m) get a phase related to the unit cell change 
     zH_FockBulk1Temp(:,:) = zFockBulkTemp(nC3pairs(:),nC3pairs(:),1)
-    zH_FockBulk1Temp(ndim/4*1,:) = zH_FockBulk1Temp(1*ndim/4,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-    zH_FockBulk1Temp(ndim/4*2,:) = zH_FockBulk1Temp(2*ndim/4,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-    zH_FockBulk1Temp(ndim/4*3,:) = zH_FockBulk1Temp(3*ndim/4,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-    zH_FockBulk1Temp(ndim/4*4,:) = zH_FockBulk1Temp(4*ndim/4,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-    zH_FockBulk1Temp(:,ndim/4*1) = zH_FockBulk1Temp(:,1*ndim/4)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-    zH_FockBulk1Temp(:,ndim/4*2) = zH_FockBulk1Temp(:,2*ndim/4)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-    zH_FockBulk1Temp(:,ndim/4*3) = zH_FockBulk1Temp(:,3*ndim/4)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-    zH_FockBulk1Temp(:,ndim/4*4) = zH_FockBulk1Temp(:,4*ndim/4)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-    
+    do nlayer=1,nlayers
+      if(RotateLayers(nlayer).eq.-1)then
+
+        zH_FockBulk1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:) =&
+              zH_FockBulk1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+        zH_FockBulk1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:) =&
+              zH_FockBulk1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
+        zH_FockBulk1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2) =&
+              zH_FockBulk1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+        zH_FockBulk1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers) =&
+              zH_FockBulk1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+
+      else if(RotateLayers(nlayer).eq.1)then
+
+        zH_FockBulk1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:) =&
+              zH_FockBulk1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+        zH_FockBulk1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:) =&
+              zH_FockBulk1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
+        zH_FockBulk1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2) =&
+              zH_FockBulk1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+        zH_FockBulk1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers) =&
+              zH_FockBulk1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+
+      endif
+    enddo
+
     zFockBulkTemp(:,:,1) = zFockBulkTemp(:,:,1) + zH_FockBulk1Temp(:,:)
   
     ivk1c3 = nMomentaComponents(C3_RelatedMomenta(icountk,3),1)
@@ -312,17 +341,34 @@ subroutine Solve_C3(zFockBulk,zFock,Potential,alpha,Bands,zEigenvectors,&
       
     enddo
     
-    ! Apply C_3^2 to zFockBulkTemp(:,:,1) (equivalenlty, C_3 to current zFockBulk1Temp(:,:,1)),
-    ! obtain the full C_3^2-tranformed zFockBulkTemp and add the contribution
+    ! Apply C_3^2 to FockBulkTemp(:,:,1) (equivalenlty, C_3 to current FockBulk1Temp(:,:,1)),
+    ! obtain the full C_3^2-tranformed FockBulkTemp and add the contribution 
     zH_FockBulk1Temp(:,:) = zH_FockBulk1Temp(nC3pairs(:),nC3pairs(:))
-    zH_FockBulk1Temp(ndim/4*1,:) = zH_FockBulk1Temp(1*ndim/4,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-    zH_FockBulk1Temp(ndim/4*2,:) = zH_FockBulk1Temp(2*ndim/4,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-    zH_FockBulk1Temp(ndim/4*3,:) = zH_FockBulk1Temp(3*ndim/4,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-    zH_FockBulk1Temp(ndim/4*4,:) = zH_FockBulk1Temp(4*ndim/4,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-    zH_FockBulk1Temp(:,ndim/4*1) = zH_FockBulk1Temp(:,1*ndim/4)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-    zH_FockBulk1Temp(:,ndim/4*2) = zH_FockBulk1Temp(:,2*ndim/4)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-    zH_FockBulk1Temp(:,ndim/4*3) = zH_FockBulk1Temp(:,3*ndim/4)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-    zH_FockBulk1Temp(:,ndim/4*4) = zH_FockBulk1Temp(:,4*ndim/4)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
+    do nlayer=1,nlayers
+      if(RotateLayers(nlayer).eq.-1)then
+
+        zH_FockBulk1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:) =&
+              zH_FockBulk1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+        zH_FockBulk1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:) =&
+              zH_FockBulk1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
+        zH_FockBulk1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2) =&
+              zH_FockBulk1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+        zH_FockBulk1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers) =&
+              zH_FockBulk1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+
+      else if(RotateLayers(nlayer).eq.1)then
+
+        zH_FockBulk1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:) =&
+              zH_FockBulk1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+        zH_FockBulk1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:) =&
+              zH_FockBulk1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
+        zH_FockBulk1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2) =&
+              zH_FockBulk1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+        zH_FockBulk1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers) =&
+              zH_FockBulk1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+
+      endif
+    enddo
     
     zFockBulkTemp(:,:,1) = zFockBulkTemp(:,:,1) + zH_FockBulk1Temp(:,:)
     
@@ -515,15 +561,15 @@ end subroutine GetFock
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-subroutine GetFock_C3(zFock,zSortedEigenvectors,ndim,numb,numk,DegFactor,OccStates,PartOccStates,Coords,MomentaValues,numNeighborCells,nUnitCell_1,nUnitCell_2,nSortedMomenta,nC3pairs)
+subroutine GetFock_C3(zFock,zSortedEigenvectors,ndim,RotateLayers,numb,numk,DegFactor,OccStates,PartOccStates,Coords,MomentaValues,numNeighborCells,nUnitCell_1,nUnitCell_2,nSortedMomenta,nC3pairs)
 
-  integer(dp), intent(in)    :: ndim,numb,numk,OccStates,PartOccStates,numNeighborCells,nC3pairs(ndim)
+  integer(dp), intent(in)    :: ndim,RotateLayers(nlayers),numb,numk,OccStates,PartOccStates,numNeighborCells,nC3pairs(ndim)
   integer(dp), intent(in)    :: nUnitCell_1(numNeighborCells),nUnitCell_2(numNeighborCells),nSortedMomenta(numb*numk*numk,2)
   real(dp), intent(in)        :: Coords(ndim,3),MomentaValues(numk,numk,2),DegFactor
   complex(dp), intent(in) :: zSortedEigenvectors(ndim,numb*numk*numk)
   complex(dp) , intent(inout)   :: zFock(ndim,ndim,numNeighborCells)
 
-  integer(dp) :: n1,n2,ivk1,ivk2, i,nband,iUnitCell,icount
+  integer(dp) :: n1,n2,nlayer,ivk1,ivk2, i,nband,iUnitCell,icount
   real(dp) :: vk(2)
   complex(dp) :: zP(ndim,1),zdeg
   complex(dp) :: zFock1Temp(ndim,ndim), zFockTemp(ndim,ndim,numNeighborCells)
@@ -601,7 +647,7 @@ subroutine GetFock_C3(zFock,zSortedEigenvectors,ndim,numb,numk,DegFactor,OccStat
   !$omp end parallel do
 
   !$omp parallel do & 
-  !$omp private(nband, ivk1,ivk2,icount,vk,zP,zFockTemp,zFock1Temp) &
+  !$omp private(nband,nlayer, ivk1,ivk2,icount,vk,zP,zFockTemp,zFock1Temp) &
   !$omp private(i,iUnitCell,n1,n2) &
   !$omp shared(OccStates,PartOccStates,nSortedMomenta,MomentaValues,Coords,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,numk,zSortedEigenvectors,nC3pairs) &
   !$omp reduction(+:zFock)
@@ -634,14 +680,31 @@ subroutine GetFock_C3(zFock,zSortedEigenvectors,ndim,numb,numk,DegFactor,OccStat
       enddo
           
       zFock1Temp(:,:) = zFockTemp(nC3pairs(:),nC3pairs(:),1)
-      zFock1Temp(ndim/4*1,:) = zFock1Temp(1*ndim/4,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-      zFock1Temp(ndim/4*2,:) = zFock1Temp(2*ndim/4,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-      zFock1Temp(ndim/4*3,:) = zFock1Temp(3*ndim/4,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-      zFock1Temp(ndim/4*4,:) = zFock1Temp(4*ndim/4,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-      zFock1Temp(:,ndim/4*1) = zFock1Temp(:,1*ndim/4)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-      zFock1Temp(:,ndim/4*2) = zFock1Temp(:,2*ndim/4)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-      zFock1Temp(:,ndim/4*3) = zFock1Temp(:,3*ndim/4)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-      zFock1Temp(:,ndim/4*4) = zFock1Temp(:,4*ndim/4)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
+      do nlayer=1,nlayers
+        if(RotateLayers(nlayer).eq.-1)then
+
+          zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:) =&
+                zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+          zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:) =&
+                zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
+          zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2) =&
+                zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+          zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers) =&
+                zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+
+        else if(RotateLayers(nlayer).eq.1)then
+
+          zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:) =&
+                zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+          zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:) =&
+                zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
+          zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2) =&
+                zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+          zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers) =&
+                zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+
+        endif
+      enddo
       
       zFockTemp(:,:,1) = zFockTemp(:,:,1) + zFock1Temp(:,:)
       do iUnitCell=2,numNeighborCells
@@ -654,14 +717,31 @@ subroutine GetFock_C3(zFock,zSortedEigenvectors,ndim,numb,numk,DegFactor,OccStat
       enddo
    
       zFock1Temp(:,:) = zFock1Temp(nC3pairs(:),nC3pairs(:))
-      zFock1Temp(ndim/4*1,:) = zFock1Temp(1*ndim/4,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-      zFock1Temp(ndim/4*2,:) = zFock1Temp(2*ndim/4,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-      zFock1Temp(ndim/4*3,:) = zFock1Temp(3*ndim/4,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-      zFock1Temp(ndim/4*4,:) = zFock1Temp(4*ndim/4,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-      zFock1Temp(:,ndim/4*1) = zFock1Temp(:,1*ndim/4)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-      zFock1Temp(:,ndim/4*2) = zFock1Temp(:,2*ndim/4)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-      zFock1Temp(:,ndim/4*3) = zFock1Temp(:,3*ndim/4)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-      zFock1Temp(:,ndim/4*4) = zFock1Temp(:,4*ndim/4)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
+      do nlayer=1,nlayers
+        if(RotateLayers(nlayer).eq.-1)then
+
+          zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:) =&
+                zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+          zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:) =&
+                zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
+          zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2) =&
+                zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+          zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers) =&
+                zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+
+        else if(RotateLayers(nlayer).eq.1)then
+
+          zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:) =&
+                zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+          zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:) =&
+                zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
+          zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2) =&
+                zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+          zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers) =&
+                zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+
+        endif
+      enddo
       
       zFockTemp(:,:,1) = zFockTemp(:,:,1) + zFock1Temp(:,:)
       do iUnitCell=2,numNeighborCells
@@ -682,7 +762,7 @@ subroutine GetFock_C3(zFock,zSortedEigenvectors,ndim,numb,numk,DegFactor,OccStat
 
     
   !$omp parallel do & 
-  !$omp private(nband, ivk1,ivk2,icount,vk,zP,zFockTemp,zFock1Temp) &
+  !$omp private(nband,nlayer,ivk1,ivk2,icount,vk,zP,zFockTemp,zFock1Temp) &
   !$omp private(i,iUnitCell,n1,n2) &
   !$omp shared(OccStates,PartOccStates,nSortedMomenta,MomentaValues,Coords,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,numk,zSortedEigenvectors,zdeg,nC3pairs) &
   !$omp reduction(+:zFock)
@@ -715,14 +795,31 @@ subroutine GetFock_C3(zFock,zSortedEigenvectors,ndim,numb,numk,DegFactor,OccStat
       enddo
           
       zFock1Temp(:,:) = zFockTemp(nC3pairs(:),nC3pairs(:),1)
-      zFock1Temp(ndim/4*1,:) = zFock1Temp(1*ndim/4,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-      zFock1Temp(ndim/4*2,:) = zFock1Temp(2*ndim/4,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-      zFock1Temp(ndim/4*3,:) = zFock1Temp(3*ndim/4,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-      zFock1Temp(ndim/4*4,:) = zFock1Temp(4*ndim/4,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-      zFock1Temp(:,ndim/4*1) = zFock1Temp(:,1*ndim/4)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-      zFock1Temp(:,ndim/4*2) = zFock1Temp(:,2*ndim/4)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-      zFock1Temp(:,ndim/4*3) = zFock1Temp(:,3*ndim/4)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
-      zFock1Temp(:,ndim/4*4) = zFock1Temp(:,4*ndim/4)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
+      do nlayer=1,nlayers
+        if(RotateLayers(nlayer).eq.-1)then
+
+          zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:) =&
+                zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+          zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:) =&
+                zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
+          zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2) =&
+                zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+          zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers) =&
+                zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+
+        else if(RotateLayers(nlayer).eq.1)then
+
+          zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:) =&
+                zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+          zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:) =&
+                zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp))
+          zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2) =&
+                zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2)*exp(-cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+          zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers) =&
+                zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers)*exp(cmplx(0.0_dp,2*pi*real(ivk1+ivk2)/real(numk),dp)) 
+
+        endif
+      enddo
       
       zFockTemp(:,:,1) = zFockTemp(:,:,1) + zFock1Temp(:,:)
       do iUnitCell=2,numNeighborCells
@@ -735,14 +832,31 @@ subroutine GetFock_C3(zFock,zSortedEigenvectors,ndim,numb,numk,DegFactor,OccStat
       enddo
       
       zFock1Temp(:,:) = zFock1Temp(nC3pairs(:),nC3pairs(:))
-      zFock1Temp(ndim/4*1,:) = zFock1Temp(1*ndim/4,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-      zFock1Temp(ndim/4*2,:) = zFock1Temp(2*ndim/4,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-      zFock1Temp(ndim/4*3,:) = zFock1Temp(3*ndim/4,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-      zFock1Temp(ndim/4*4,:) = zFock1Temp(4*ndim/4,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-      zFock1Temp(:,ndim/4*1) = zFock1Temp(:,1*ndim/4)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-      zFock1Temp(:,ndim/4*2) = zFock1Temp(:,2*ndim/4)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-      zFock1Temp(:,ndim/4*3) = zFock1Temp(:,3*ndim/4)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
-      zFock1Temp(:,ndim/4*4) = zFock1Temp(:,4*ndim/4)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
+      do nlayer=1,nlayers
+        if(RotateLayers(nlayer).eq.-1)then
+
+          zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:) =&
+                zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+          zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:) =&
+                zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
+          zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2) =&
+                zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+          zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers) =&
+                zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+
+        else if(RotateLayers(nlayer).eq.1)then
+
+          zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:) =&
+                zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers/2,:)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+          zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:) =&
+                zFock1Temp(ndim/nlayers*(nlayer-1) + ndim/nlayers,:)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp))
+          zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2) =&
+                zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers/2)*exp(cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+          zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers) =&
+                zFock1Temp(:,ndim/nlayers*(nlayer-1) + ndim/nlayers)*exp(-cmplx(0.0_dp,2*pi*real(ivk1)/real(numk),dp)) 
+
+        endif
+      enddo
       
       zFockTemp(:,:,1) = zFockTemp(:,:,1) + zFock1Temp(:,:)
       do iUnitCell=2,numNeighborCells

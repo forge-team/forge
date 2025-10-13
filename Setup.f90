@@ -3,9 +3,10 @@ module Setup
 
 implicit none
 
-integer, parameter :: dp = 8                             ! dp=4/8: single/double precision
-integer(dp), parameter :: nlayers = 2                    ! number of layers
-integer(dp), parameter :: ntheta = 9                    ! twist angle = acos(1 - 1/(6ntheta^2 + 6ntheta + 2))
+integer, parameter :: dp = 8                                                               ! dp=4/8: single/double precision
+integer(dp), parameter :: nlayers = 2                                                      ! number of layers
+integer(dp), parameter :: ntheta = 9                                                       ! twist angle = acos(1 - 1/(6ntheta^2 + 6ntheta + 2))
+integer(dp), parameter :: RotateLayers(nlayers) = [-1,+1]                                  ! Positive/negative rotation of layers 
 integer(dp), parameter :: ndim = nlayers*2*(ntheta**2+(ntheta+1)**2+(ntheta+1)*ntheta)     ! number of atoms in unt cell
 integer(dp), parameter :: numk = 6                       ! number of grid points in the BZ  Nk = numk * numk
 integer(dp), parameter :: nrelax = 0                     ! 0/1: unrelaxed/relaxed lattice  

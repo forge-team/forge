@@ -241,7 +241,7 @@ else
 
     if(nenforceC3.eq.1)then
         call Solve_C3(zFockBulk(:,:,:,1),zFock(:,:,:,1),Potential(:,1),alpha,Bands(:,:,1), &
-            zEigenvectors(:,:,:,1),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),g1,g2,nC3pairs)
+            zEigenvectors(:,:,:,1),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,RotateLayers,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),g1,g2,nC3pairs)
     else
         call Solve(zFockBulk(:,:,:,1),zFock(:,:,:,1),Potential(:,1),alpha,Bands(:,:,1), &
             zEigenvectors(:,:,:,1),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]))
@@ -269,7 +269,7 @@ else
     write(*,*) 'get zFock...'
     zFock(:,:,:,nspin) = cmplx(0.0_dp,0.0_dp,dp)
     if(nenforceC3.eq.1)then
-        call GetFock_C3(zFock(:,:,:,nspin),zSortedEigenvectors(:,:,nspin),ndim,numb,numk,&
+        call GetFock_C3(zFock(:,:,:,nspin),zSortedEigenvectors(:,:,nspin),ndim,RotateLayers,numb,numk,&
         DegFactor,nOccStates(nspin),nPartOccStates(nspin),Coords,MomentaValues,numNeighborCells,nUnitCell_1,nUnitCell_2,nSortedMomenta(:,:,nspin),nC3pairs)
     else
         call GetFock(zFock(:,:,:,nspin),zSortedEigenvectors(:,:,nspin),ndim,numb,numk,&
@@ -372,7 +372,7 @@ do while(it.LT.itmax)
     
         if(nenforceC3.eq.1)then
             call Solve_C3(zFockBulk(:,:,:,nspin),zFock(:,:,:,nspin),Potential(:,nspin),alpha,Bands(:,:,nspin), &
-                zEigenvectors(:,:,:,nspin),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),g1,g2,nC3pairs)
+                zEigenvectors(:,:,:,nspin),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,RotateLayers,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),g1,g2,nC3pairs)
         else
             call Solve(zFockBulk(:,:,:,nspin),zFock(:,:,:,nspin),Potential(:,nspin),alpha,Bands(:,:,nspin), &
                 zEigenvectors(:,:,:,nspin),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]))
@@ -470,7 +470,7 @@ do while(it.LT.itmax)
             write(*,*) 'get Fock...'
             zFock(:,:,:,nspin) = cmplx(0.0_dp,0.0_dp,dp)
             if(nenforceC3.eq.1)then
-                call GetFock_C3(zFock(:,:,:,nspin),zSortedEigenvectors(:,:,nspin),ndim,numb,numk,&
+                call GetFock_C3(zFock(:,:,:,nspin),zSortedEigenvectors(:,:,nspin),ndim,RotateLayers,numb,numk,&
                 DegFactor,nOccStates(nspin),nPartOccStates(nspin),Coords,MomentaValues,numNeighborCells,nUnitCell_1,nUnitCell_2,nSortedMomenta(:,:,nspin),nC3pairs)
             else
                 call GetFock(zFock(:,:,:,nspin),zSortedEigenvectors(:,:,nspin),ndim,numb,numk,&
@@ -484,7 +484,7 @@ do while(it.LT.itmax)
                 SortedEnergies_1Spin(:,nspin),nSortedMomenta(:,:,nspin),zEigenvectors(:,:,:,nspin),Bands(:,:,nspin))
 
             if(nenforceC3.eq.1)then
-                call GetFock_C3(zFock(:,:,:,nspin),zSortedEigenvectors(:,:,nspin),ndim,numb,numk,&
+                call GetFock_C3(zFock(:,:,:,nspin),zSortedEigenvectors(:,:,nspin),ndim,RotateLayers,numb,numk,&
                 DegFactor,nOccStates(nspin),nPartOccStates(nspin),Coords,MomentaValues,numNeighborCells,nUnitCell_1,nUnitCell_2,nSortedMomenta(:,:,nspin),nC3pairs)
             else
                 call GetFock(zFock(:,:,:,nspin),zSortedEigenvectors(:,:,nspin),ndim,numb,numk,&
@@ -498,7 +498,7 @@ do while(it.LT.itmax)
             write(*,*) 'get Fock...'
             zFock(:,:,:,nspin) = cmplx(0.0_dp,0.0_dp,dp)
             if(nenforceC3.eq.1)then
-                call GetFock_C3(zFock(:,:,:,nspin),zSortedEigenvectors(:,:,nspin),ndim,numb,numk,&
+                call GetFock_C3(zFock(:,:,:,nspin),zSortedEigenvectors(:,:,nspin),ndim,RotateLayers,numb,numk,&
                 DegFactor,nOccStates(nspin),nPartOccStates(nspin),Coords,MomentaValues,numNeighborCells,nUnitCell_1,nUnitCell_2,nSortedMomenta(:,:,nspin),nC3pairs)
             else
                 call GetFock(zFock(:,:,:,nspin),zSortedEigenvectors(:,:,nspin),ndim,numb,numk,&

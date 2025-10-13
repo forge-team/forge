@@ -134,24 +134,17 @@ subroutine WignerSeitzCell(Coords,t1,t2,cs,sn)
 
   real(dp), intent(in)    :: t1(2), t2(2), cs, sn
   real(dp), intent(inout) :: Coords(ndim,3)
-  integer(dp) :: na1, nb1, na2, nb2, n1, n2, n, nind, nrad
+  integer(dp) :: n1, n2, n, nind, nrad, nlayer
   real(dp)    :: rMax, rTemp1, rTemp2, rTemp3, an1, an2, bn1, bn2, sq3=sqrt(3.0_dp)
 
   nrad=3*ntheta
-  ! initialize running parameters
-
-  nind=0
-  na1=0
-  nb1=0
-  na2=0
-  nb2=0
-
   rMax = 3.0_dp*ntheta**2+3.0_dp*ntheta+1.0_dp
 
-  if(nlayers.EQ.2)then
+  nind=0
+  do nlayer=1,nlayers
 
-    if (ntheta.ne.0)then     
-      ! Find Coordsinate of site A layer 1 is within 1st Wigner-Seitz cell
+    if(RotateLayers(nlayer).eq.-1)then
+      ! Find Coordinate of site A layer 1 is within 1st Wigner-Seitz cell
       do n1=-nrad,nrad
         do n2=-nrad,nrad
     
@@ -164,12 +157,11 @@ subroutine WignerSeitzCell(Coords,t1,t2,cs,sn)
 
           if(rTemp1 < rMax .and. rTemp2 < rMax .and. rTemp3 < rMax)then
 
-            na1=na1+1
             nind=nind+1
 
             Coords(nind,1)=(n1+1.0_dp/3.0_dp)*a1(1)+(n2-2.0_dp/3.0_dp)*a2(1)
             Coords(nind,2)=(n1+1.0_dp/3.0_dp)*a1(2)+(n2-2.0_dp/3.0_dp)*a2(2)
-            Coords(nind,3)=-tz/2
+            Coords(nind,3)= (real(nlayer-1) - real(nlayers-1)/2)*tz
 
           end if
 
@@ -181,7 +173,7 @@ subroutine WignerSeitzCell(Coords,t1,t2,cs,sn)
 
       Coords(nind,1)=(-t2(1)-t1(1))/3.0_dp
       Coords(nind,2)=(-t2(2)-t1(2))/3.0_dp
-      Coords(nind,3)=-tz/2
+      Coords(nind,3)= (real(nlayer-1) - real(nlayers-1)/2)*tz
 
       ! Find Coordsinate of site B layer 1 is within 1st Wigner-Seitz cell
       do n1=-nrad,nrad
@@ -197,12 +189,11 @@ subroutine WignerSeitzCell(Coords,t1,t2,cs,sn)
 
 
           if(rTemp1 < rMax .and. rTemp2 < rMax .and. rTemp3 < rMax)then
-            nb1=nb1+1
             nind=nind+1
 
             Coords(nind,1)=bn1*a1(1)+bn2*a2(1)
             Coords(nind,2)=bn1*a1(2)+bn2*a2(2)
-            Coords(nind,3)=-tz/2
+            Coords(nind,3)= (real(nlayer-1) - real(nlayers-1)/2)*tz
           end if
 
 
@@ -214,9 +205,9 @@ subroutine WignerSeitzCell(Coords,t1,t2,cs,sn)
 
       Coords(nind,1)=(t2(1)+t1(1))/3.0_dp
       Coords(nind,2)=(t2(2)+t1(2))/3.0_dp
-      Coords(nind,3)=-tz/2
+      Coords(nind,3)= (real(nlayer-1) - real(nlayers-1)/2)*tz
 
-    
+    else if (RotateLayers(nlayer).eq.1)then
       ! Find Coordsinate of site A layer 2 is within 1st Wigner-Seitz cell
       do n1=-nrad,nrad
         do n2=-nrad,nrad
@@ -229,11 +220,10 @@ subroutine WignerSeitzCell(Coords,t1,t2,cs,sn)
           rTemp3=abs(an1*(3.0_dp*ntheta+2)+an2)+ 1e-6
 
           if(rTemp1 < rMax .and. rTemp2 .LT. rMax .and. rTemp3 < rMax)then
-            na2=na2+1
             nind=nind+1
             Coords(nind,1)=an1*a1(1)+an2*a2(1)
             Coords(nind,2)=an1*a1(2)+an2*a2(2)
-            Coords(nind,3)=tz/2
+            Coords(nind,3)= (real(nlayer-1) - real(nlayers-1)/2)*tz
 
           end if
         end do
@@ -244,7 +234,7 @@ subroutine WignerSeitzCell(Coords,t1,t2,cs,sn)
 
       Coords(nind,1)=(t1(1)+t2(1))/3.0_dp
       Coords(nind,2)=(t1(2)+t2(2))/3.0_dp
-      Coords(nind,3)=tz/2
+      Coords(nind,3)= (real(nlayer-1) - real(nlayers-1)/2)*tz
 
       ! Find Coordsinate of site B layer 2 is within 1st Wigner-Seitz cell
       do n1=-nrad,nrad
@@ -259,12 +249,11 @@ subroutine WignerSeitzCell(Coords,t1,t2,cs,sn)
 
           if(rTemp1 < rMax .AND. rTemp2 < rMax .AND. rTemp3 < rMax)then
 
-            nb2=nb2+1
             nind=nind+1
 
             Coords(nind,1)=bn1*a1(1)+bn2*a2(1)
             Coords(nind,2)=bn1*a1(2)+bn2*a2(2)
-            Coords(nind,3)=tz/2
+            Coords(nind,3)= (real(nlayer-1) - real(nlayers-1)/2)*tz
 
           end if
     
@@ -276,167 +265,10 @@ subroutine WignerSeitzCell(Coords,t1,t2,cs,sn)
     
       Coords(nind,1)=(-t1(1)-t2(1))/3.0_dp
       Coords(nind,2)=(-t1(2)-t2(2))/3.0_dp
-      Coords(nind,3)=tz/2
-  
-    endif
-
-    if(ntheta.eq.0)then
-      ! Coordinates AB bilayer
-      Coords(1,1) = 0.0_dp
-      Coords(1,2) = 0.0_dp
-      Coords(1,3) = -tz/2
-
-      Coords(2,1) = (2*t1(1) - t2(1))/3.0_dp
-      Coords(2,2) = (2*t1(2) - t2(2))/3.0_dp
-      Coords(2,3) = -tz/2
-      
-      Coords(3,1) = -(2*t1(1) - t2(1))/3.0_dp 
-      Coords(3,2) = -(2*t1(2) - t2(2))/3.0_dp
-      Coords(3,3) = tz/2
-      
-      Coords(4,1) = 0.0_dp
-      Coords(4,2) = 0.0_dp
-      Coords(4,3) = tz/2
-
-    endif
-
-  endif
- 
-  if(nlayers.EQ.3)then
-    ! Find Coordinate of site A layer 1 is within 1st Wigner-Seitz cell
-    do n1=-nrad,nrad
-      do n2=-nrad,nrad
-  
-        an1=(n1+1.0_dp/3.0_dp)
-        an2=(n2-2.0_dp/3.0_dp)
-  
-        rTemp1=abs(an1*(3.0_dp*ntheta+1)+an2*(3.0_dp*ntheta+2))+ 1e-6
-        rTemp2=abs(an1-an2*(3.0_dp*ntheta+1))+ 1e-6
-        rTemp3=abs(an1*(3.0_dp*ntheta+2)+an2)+ 1e-6
-
-        if(rTemp1 < rMax .and. rTemp2 < rMax .and. rTemp3 < rMax)then
-
-          na1=na1+1
-          nind=nind+1
-
-          Coords(nind,1)=(n1+1.0_dp/3.0_dp)*a1(1)+(n2-2.0_dp/3.0_dp)*a2(1)
-          Coords(nind,2)=(n1+1.0_dp/3.0_dp)*a1(2)+(n2-2.0_dp/3.0_dp)*a2(2)
-          Coords(nind,3)=-tz
-
-        end if
-
-      end do
-    end do
-
-    !! Include A atom at zone boundary
-    nind=nind+1
-
-    Coords(nind,1)=(-t2(1)-t1(1))/3.0_dp
-    Coords(nind,2)=(-t2(2)-t1(2))/3.0_dp
-    Coords(nind,3)=-tz
-
-    ! Find Coordsinate of site B layer 1 is within 1st Wigner-Seitz cell
-    do n1=-nrad,nrad
-      do n2=-nrad,nrad
-
-        bn1=n1+2.0_dp/3.0_dp
-        bn2=n2-1.0_dp/3.0_dp
-
-
-        rTemp1=abs(bn1*(3.0_dp*ntheta+1)+bn2*(3.0_dp*ntheta+2))+ 1e-6
-        rTemp2=abs(bn1-bn2*(3.0_dp*ntheta+1))+ 1e-6
-        rTemp3=abs(bn1*(3.0_dp*ntheta+2)+bn2)+ 1e-6
-
-
-        if(rTemp1 < rMax .and. rTemp2 < rMax .and. rTemp3 < rMax)then
-          nb1=nb1+1
-          nind=nind+1
-
-          Coords(nind,1)=bn1*a1(1)+bn2*a2(1)
-          Coords(nind,2)=bn1*a1(2)+bn2*a2(2)
-          Coords(nind,3)=-tz
-        end if
-
-
-      end do
-    end do
-
-    !! Include B atom at zone boundary
-    nind=nind+1
-
-    Coords(nind,1)=(t2(1)+t1(1))/3.0_dp
-    Coords(nind,2)=(t2(2)+t1(2))/3.0_dp
-    Coords(nind,3)=-tz
-
-  
-    ! Find Coordsinate of site A layer 2 is within 1st Wigner-Seitz cell
-    do n1=-nrad,nrad
-      do n2=-nrad,nrad
-
-        an1=(n1+1.0_dp/3.0_dp)*(cs-sn/sq3)-2*(n2-2.0_dp/3.0_dp)*sn/sq3
-        an2=(n2-2.0_dp/3.0_dp)*(cs+sn/sq3)+2*(n1+1.0_dp/3.0_dp)*sn/sq3
-
-        rTemp1=abs(an1*(3.0_dp*ntheta+1)+an2*(3.0_dp*ntheta+2))+ 1e-6
-        rTemp2=abs(an1-an2*(3.0_dp*ntheta+1))+ 1e-6
-        rTemp3=abs(an1*(3.0_dp*ntheta+2)+an2)+ 1e-6
-
-        if(rTemp1 < rMax .and. rTemp2 .LT. rMax .and. rTemp3 < rMax)then
-          na2=na2+1
-          nind=nind+1
-          Coords(nind,1)=an1*a1(1)+an2*a2(1)
-          Coords(nind,2)=an1*a1(2)+an2*a2(2)
-          Coords(nind,3)=0.0_dp
-
-        end if
-      end do
-    end do
-
-    !! Include A atom at zone boundary
-    nind=nind+1
-
-    Coords(nind,1)=(t1(1)+t2(1))/3.0_dp
-    Coords(nind,2)=(t1(2)+t2(2))/3.0_dp
-    Coords(nind,3)=0.0_dp
-
-    ! Find Coordsinate of site B layer 2 is within 1st Wigner-Seitz cell
-    do n1=-nrad,nrad
-      do n2=-nrad,nrad
-
-        bn1=(n1+2.0_dp/3.0_dp)*(cs-sn/sq3)-2*(n2-1.0_dp/3.0_dp)*sn/sq3
-        bn2=(n2-1.0_dp/3.0_dp)*(cs+sn/sq3)+2*(n1+2.0_dp/3.0_dp)*sn/sq3
-
-        rTemp1=abs(bn1*(3.0_dp*ntheta+1)+bn2*(3.0_dp*ntheta+2))+ 1e-6
-        rTemp2=abs(bn1-bn2*(3.0_dp*ntheta+1))+ 1e-6
-        rTemp3=abs(bn1*(3.0_dp*ntheta+2)+bn2)+ 1e-6
-
-        if(rTemp1 < rMax .AND. rTemp2 < rMax .AND. rTemp3 < rMax)then
-
-          nb2=nb2+1
-          nind=nind+1
-
-          Coords(nind,1)=bn1*a1(1)+bn2*a2(1)
-          Coords(nind,2)=bn1*a1(2)+bn2*a2(2)
-          Coords(nind,3)=0.0_dp
-
-        end if
-  
-      end do
-    end do
-
-    !!! Include B atom at zone boundary
-    nind=nind+1
-  
-    Coords(nind,1)=(-t1(1)-t2(1))/3.0_dp
-    Coords(nind,2)=(-t1(2)-t2(2))/3.0_dp
-    Coords(nind,3)=0.0_dp
-
-    ! Coordinates layer 3
-    do n = 1,ndim/3
-      Coords(nind + n,1:2) = Coords(n,1:2)
-      Coords(nind + n,3) = tz 
-    enddo
+      Coords(nind,3)= (real(nlayer-1) - real(nlayers-1)/2)*tz
     
-  endif
+    endif
+  enddo
 
 end subroutine WignerSeitzCell
 
