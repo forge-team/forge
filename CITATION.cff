@@ -1,0 +1,14 @@
+cff-version: 1.0.1
+message: "If you use this software, please cite it as below."
+title: "Forge: Fock Optimization of Real-Space Giant Environment"
+authors:          Stauber, Tobias 
+                  Sánchez Sánchez, Miguel 
+                  Vasilevskiy, Igor 
+                  González, José 
+                  Mouriño Gallego, José Carlos 
+                  Wackerl, Martin 
+                  Wenk, Paul 
+                  Schliemann, John
+date-released: 2025-10-16
+url: https://github.com/forge-team/forge
+doi: 10.5281/zenodo.17368106 

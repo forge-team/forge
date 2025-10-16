@@ -35,3 +35,12 @@ Special thanks to **[José González Carmona]**, **[José Carlos Mouriño Galleg
 
 This project is licensed under the terms of the MIT License.  
 See the [LICENSE](LICENSE) file for more information.
+
+## Citation
+
+If you use this software, please cite:
+
+T. Stauber, M. Sánchez Sánchez, I. Vasilevskiy, J. González, J. C. Mouriño Gallego, M. Wackerl, P. Wenk, and J. Schliemann,  Forge: Fock Optimization of Real-Space Giant Environment, (2025). 
+Zenodo. https://doi.org/10.5281/zenodo.17368106
+
+If you use this software in academic work or other publications, please cite it appropriately. See [CITATION.cff](CITATION.cff) for citation instructions.
