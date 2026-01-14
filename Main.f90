@@ -154,7 +154,9 @@ t2 = matmul(RotMatrix,t2)
 t3 = t2-t1
 
 if(nrelax.EQ.1)then
-    call LatticeRelaxation(Coords,g1,g12)
+    if (nlayers.EQ.2)then   !Lattice relaxation available only for nlayers=2 in current version
+        call LatticeRelaxation(Coords,g1,g12)
+    endif
 endif
 
 call C2_RelatedPoints(nC2pairs,Coords,ndim)
