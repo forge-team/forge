@@ -44,12 +44,13 @@ subroutine TightBindingHamiltonian(zH,Delta,Coords,nUnitCell_1,nUnitCell_2,ndim,
 
     end do
   end do
-
+  if(nlayers.GT.1)then
   do n1 = 0,nlayers-1
     do i=1,ndim/nlayers
       zH(i+ n1*ndim/nlayers,i+ n1*ndim/nlayers) = zH(i+ n1*ndim/nlayers,i+ n1*ndim/nlayers) + (n1 - real(nlayers-1)/2)*Delta/real(nlayers-1)
     enddo
   enddo
+  endif
  
 end subroutine TightBindingHamiltonian
 
@@ -69,19 +70,19 @@ subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,v
  
   zV = cmplx(0.0_dp,0.0_dp,dp)
   
-  do nlayer=0,nlayers-1
+  do nlayer=1,nlayers
 
-    do i = ndim/nlayers*nlayer + 1 ,ndim/nlayers*nlayer + ndim/nlayers/2
-      do j = ndim/nlayers*nlayer + 1 ,ndim/nlayers*nlayer + ndim/nlayers/2
+    do i = ndim/nlayers*(nlayer-1) + 1 ,ndim/nlayers*(nlayer-1) + ndim/nlayers/2
+      do j = ndim/nlayers*(nlayer-1) + 1 ,ndim/nlayers*(nlayer-1) + ndim/nlayers/2
 
         ri =  Coords(i,:)
         rj =  Coords(j,:)
       
         zphase=exp(cmplx(0.0_dp,-dot_product(vk,Coords(i,1:2)-Coords(j,1:2))*real(fphase,dp),dp))
         
-        if (mod(nlayer,2).eq.0)then
+        if (RotateLayers(nlayer).eq.-1)then
           zV(i,j) = zV(i,j) + ftvalley(ri,rj,transpose(RotMatrix))*zphase
-        else if (mod(nlayer,2).eq.1)then
+        else if (RotateLayers(nlayer).eq.1)then
           zV(i,j) = zV(i,j) + ftvalley(ri,rj,RotMatrix)*zphase
         endif
 
@@ -94,9 +95,9 @@ subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,v
           
           zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
           
-          if (mod(nlayer,2).eq.0)then
+          if (RotateLayers(nlayer).eq.-1)then
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,transpose(RotMatrix))*zphase*exp(-zi_vk_tn)
-          else if (mod(nlayer,2).eq.1)then
+          else if (RotateLayers(nlayer).eq.1)then
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,RotMatrix)*zphase*exp(-zi_vk_tn)
           endif
           !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -105,27 +106,27 @@ subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,v
           
           zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
           
-          if (mod(nlayer,2).eq.0)then
+          if (RotateLayers(nlayer).eq.-1)then
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,transpose(RotMatrix))*zphase*exp(-zi_vk_tn)
-          else if (mod(nlayer,2).eq.1)then
+          else if (RotateLayers(nlayer).eq.1)then
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,RotMatrix)*zphase*exp(-zi_vk_tn)
-          endif        
+          endif           
         enddo
   
       end do
     end do
   
-    do i = ndim/nlayers*nlayer + ndim/nlayers/2 + 1 ,ndim/nlayers*nlayer + ndim/nlayers
-      do j = ndim/nlayers*nlayer + ndim/nlayers/2 + 1 ,ndim/nlayers*nlayer + ndim/nlayers
+    do i = ndim/nlayers*(nlayer-1) + ndim/nlayers/2 + 1 ,ndim/nlayers*(nlayer-1) + ndim/nlayers
+      do j = ndim/nlayers*(nlayer-1) + ndim/nlayers/2 + 1 ,ndim/nlayers*(nlayer-1) + ndim/nlayers
 
         ri =  Coords(i,:)
         rj =  Coords(j,:)
       
         zphase=exp(cmplx(0.0_dp,-dot_product(vk,Coords(i,1:2)-Coords(j,1:2))*real(fphase,dp),dp))
         
-        if (mod(nlayer,2).eq.0)then
+        if (RotateLayers(nlayer).eq.-1)then
           zV(i,j) = zV(i,j) + ftvalley(ri,rj,transpose(RotMatrix))*zphase
-        else if (mod(nlayer,2).eq.1)then
+        else if (RotateLayers(nlayer).eq.1)then
           zV(i,j) = zV(i,j) + ftvalley(ri,rj,RotMatrix)*zphase
         endif
 
@@ -138,22 +139,22 @@ subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,v
           
           zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
           
-          if (mod(nlayer,2).eq.0)then
+          if (RotateLayers(nlayer).eq.-1)then
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,transpose(RotMatrix))*zphase*exp(-zi_vk_tn)
-          else if (mod(nlayer,2).eq.1)then
+          else if (RotateLayers(nlayer).eq.1)then
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,RotMatrix)*zphase*exp(-zi_vk_tn)
-          endif           
+          endif         
           !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
           ri =  [Coords(i,1:2) - n1*tn(:,1) - n2*tn(:,2), Coords(i,3)]
           rj =  Coords(j,:) 
           
           zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
           
-          if (mod(nlayer,2).eq.0)then
+          if (RotateLayers(nlayer).eq.-1)then
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,transpose(RotMatrix))*zphase*exp(-zi_vk_tn)
-          else if (mod(nlayer,2).eq.1)then
+          else if (RotateLayers(nlayer).eq.1)then
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,RotMatrix)*zphase*exp(-zi_vk_tn)
-          endif         
+          endif           
         enddo
   
       end do

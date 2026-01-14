@@ -58,7 +58,7 @@ integer(dp) :: nEnergyFile,nConvergenceFile
 integer(dp) :: nFermiLevel, nOccStates(numS), nPartOccStates(numS), nWindowSort_2Spins(2,2)
 
 real(dp) :: aMoire, cs, sn
-real(dp) :: t1(2), t2(2), t3(2), g1(2), g2(2), RotMatrix(2,2)
+real(dp) :: t1(2), t2(2), t3(2), g1(2), g12(2), RotMatrix(2,2)
 real(dp) :: DensityConvergence(2), DegFactor, FermiEnergy, Step
 real(dp) :: KineticEnergy(numS),FockEnergy(numS),HartreeEnergy,HubbardEnergy,TotalEnergy
 real(dp) :: KineticEnergyIn(numS),FockEnergyIn(numS),HartreeEnergyIn,HubbardEnergyIn,TotalEnergyIn
@@ -125,7 +125,7 @@ call OrderNeighborCells(numI, numNeighborCells, nUnitCell_1, nUnitCell_2)
 ! reciprocal lattice vectors of the superlattice
 aMoire = 3.0_dp*ntheta**2 + 3.0_dp*ntheta + 1.0_dp
 g1  =  (4.0_dp*pi/3.0_dp)/aMoire*(real(3*ntheta+1,dp)*a1+a2)
-g2  =  (4.0_dp*pi/3.0_dp)/aMoire*(real(3*ntheta+2,dp)*a2-a1)    ! g2 =  g1 + vq2
+g12  =  (4.0_dp*pi/3.0_dp)/aMoire*(real(3*ntheta+2,dp)*a2-a1)    ! g12 =  g1 + g2 (g_i·t_j=2pi delta_ij see t_1,2 below)
 
 ! angle of rotation cs
 cs = 1.0_dp-1.0_dp/(2.0_dp*aMoire)
@@ -133,9 +133,9 @@ sn = sqrt(1.0_dp-cs**2)
 RotMatrix = reshape([cos(0.5_dp*acos(cs)),-sin(0.5_dp*acos(cs)),sin(0.5_dp*acos(cs)),cos(0.5_dp*acos(cs))],[2,2])
 
 g1  = matmul(RotMatrix,g1)
-g2  = matmul(RotMatrix,g2)
+g12  = matmul(RotMatrix,g12)
 
-call SampleBZ(nMomentaComponents,nMomentaFlattened,MomentaValues,numk,g1,g2)
+call SampleBZ(nMomentaComponents,nMomentaFlattened,MomentaValues,numk,g1,g12)
 
 ! Moire lattice parameters
 
@@ -154,7 +154,7 @@ t2 = matmul(RotMatrix,t2)
 t3 = t2-t1
 
 if(nrelax.EQ.1)then
-    call LatticeRelaxation(Coords,g1,g2)
+    call LatticeRelaxation(Coords,g1,g12)
 endif
 
 call C2_RelatedPoints(nC2pairs,Coords,ndim)
@@ -241,7 +241,7 @@ else
 
     if(nenforceC3.eq.1)then
         call Solve_C3(zFockBulk(:,:,:,1),zFock(:,:,:,1),Potential(:,1),alpha,Bands(:,:,1), &
-            zEigenvectors(:,:,:,1),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,RotateLayers,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),g1,g2,nC3pairs)
+            zEigenvectors(:,:,:,1),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,RotateLayers,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),g1,g12,nC3pairs)
     else
         call Solve(zFockBulk(:,:,:,1),zFock(:,:,:,1),Potential(:,1),alpha,Bands(:,:,1), &
             zEigenvectors(:,:,:,1),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]))
@@ -372,7 +372,7 @@ do while(it.LT.itmax)
     
         if(nenforceC3.eq.1)then
             call Solve_C3(zFockBulk(:,:,:,nspin),zFock(:,:,:,nspin),Potential(:,nspin),alpha,Bands(:,:,nspin), &
-                zEigenvectors(:,:,:,nspin),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,RotateLayers,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),g1,g2,nC3pairs)
+                zEigenvectors(:,:,:,nspin),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,RotateLayers,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),g1,g12,nC3pairs)
         else
             call Solve(zFockBulk(:,:,:,nspin),zFock(:,:,:,nspin),Potential(:,nspin),alpha,Bands(:,:,nspin), &
                 zEigenvectors(:,:,:,nspin),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]))
@@ -601,7 +601,7 @@ do while(it.LT.itmax)
 
             write(filename,'(A7,A5,A6,I0,A210)') dir,'Bands','-nspin',nspin,parameters
             open(99,file=filename,status='replace')
-            call PlotBands(Bands(:,:,nspin),FermiEnergy,nMomentaFlattened,numb,numk,Nk,g1,g2)
+            call PlotBands(Bands(:,:,nspin),FermiEnergy,nMomentaFlattened,numb,numk,Nk,g1,g12)
             close(99)
 
         endif
