@@ -282,7 +282,7 @@ subroutine LatticeRelaxation(Coords,g1,g12)
   real(dp), intent(in)    :: g1(2), g12(2) 
 
   real(dp) :: Gn(8,2)
-  integer(dp) :: i,j, m, n, Nk, nn
+  integer(dp) :: i,j, m, n, Nk, k
   real(dp) :: Coordsnr(ndim,3), Coordstemp(ndim,3)
   real(dp) :: ux, uy, rx, ry
   real(dp) :: uqx(5,5), uqy(5,5), delta(2)
@@ -1064,15 +1064,15 @@ subroutine LatticeRelaxation(Coords,g1,g12)
     delta(1)=(0.d0,0.d0)
     delta(2)=(0.d0,0.d0)
 
-    do nn=1,5,2
+    do k=1,5,2
       do n=2,5
         do m=1,n-1
 
-          vk(1)=(n-1)*Gn(nn,1)+(m-1)*Gn(nn+2,1)
-          vk(2)=(n-1)*Gn(nn,2)+(m-1)*Gn(nn+2,2)
+          vk(1)=(n-1)*Gn(k,1)+(m-1)*Gn(k+2,1)
+          vk(2)=(n-1)*Gn(k,2)+(m-1)*Gn(k+2,2)
 
-          ux=cos((nn-1)*pi/3.0_dp)*uqx(n,m)-sin((nn-1)*pi/3.0_dp)*uqy(n,m)
-          uy=sin((nn-1)*pi/3.0_dp)*uqx(n,m)+cos((nn-1)*pi/3.0_dp)*uqy(n,m)
+          ux=cos((k-1)*pi/3.0_dp)*uqx(n,m)-sin((k-1)*pi/3.0_dp)*uqy(n,m)
+          uy=sin((k-1)*pi/3.0_dp)*uqx(n,m)+cos((k-1)*pi/3.0_dp)*uqy(n,m)
 
           delta(1)=delta(1)-2*ux*sin(vk(1)*rx+vk(2)*ry)
           delta(2)=delta(2)-2*uy*sin(vk(1)*rx+vk(2)*ry)

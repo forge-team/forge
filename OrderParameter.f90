@@ -11,10 +11,10 @@ contains
 
 !!!!!!!!!!!!!!!
 
-subroutine NearestNeighbours(nn,nt,Coords,ndim,tn)
+subroutine NearestNeighbours(NearestNeighborInd,NearestNeighborCell,Coords,ndim,tn)
 
     integer(dp), intent(in)    :: ndim
-    integer(dp), intent(inout) :: nn(ndim,3),nt(ndim,3)
+    integer(dp), intent(inout) :: NearestNeighborInd(ndim,3),NearestNeighborCell(ndim,3)
     real(dp), intent(in)    :: tn(6,2), Coords(ndim,3)
     
     
@@ -24,7 +24,6 @@ subroutine NearestNeighbours(nn,nt,Coords,ndim,tn)
     
     do i=1,ndim
         ncount=0
-        ! write(*,*) i, Coords(i,1), Coords(i,2), Coords(i,3)
         do j=1,ndim
     
             if((Coords(i,3)-Coords(j,3))**2 .LT. deltaR)then
@@ -36,8 +35,8 @@ subroutine NearestNeighbours(nn,nt,Coords,ndim,tn)
     
                 if(rij.GT.deltaR.AND.rij.LT.a0*1.2)then
                     ncount=ncount+1
-                    nn(i,ncount)=j
-                    nt(i,ncount)=0
+                    NearestNeighborInd(i,ncount)=j
+                    NearestNeighborCell(i,ncount)=0
     
                     x=Coords(i,1)-Coords(j,1)
                     y=Coords(i,2)-Coords(j,2)
@@ -74,8 +73,8 @@ subroutine NearestNeighbours(nn,nt,Coords,ndim,tn)
     
                     if(rij.LT.a0*1.2)then
                         ncount=ncount+1
-                        nn(i,ncount)=j
-                        nt(i,ncount)=n
+                        NearestNeighborInd(i,ncount)=j
+                        NearestNeighborCell(i,ncount)=n
     
                         x=Coords(i,1)-Coords(j,1)+tn(n,1)
                         y=Coords(i,2)-Coords(j,2)+tn(n,2)
@@ -119,44 +118,44 @@ subroutine NearestNeighbours(nn,nt,Coords,ndim,tn)
     
         if(rot(i,1).LT.rot(i,2))then
             temp=rot(i,1)
-            ntemp=nn(i,1)
-            ntempt=nt(i,1)
+            ntemp=NearestNeighborInd(i,1)
+            ntempt=NearestNeighborCell(i,1)
             rot(i,1)=rot(i,2)
-            nn(i,1)=nn(i,2)
-            nt(i,1)=nt(i,2)
+            NearestNeighborInd(i,1)=NearestNeighborInd(i,2)
+            NearestNeighborCell(i,1)=NearestNeighborCell(i,2)
             rot(i,2)=temp
-            nn(i,2)=ntemp
-            nt(i,2)=ntempt
+            NearestNeighborInd(i,2)=ntemp
+            NearestNeighborCell(i,2)=ntempt
         endif
     
         if(rot(i,1).LT.rot(i,3))then
             temp1=rot(i,1)
-            ntemp1=nn(i,1)
-            ntempt1=nt(i,1)
+            ntemp1=NearestNeighborInd(i,1)
+            ntempt1=NearestNeighborCell(i,1)
             temp2=rot(i,2)
-            ntemp2=nn(i,2)
-            ntempt2=nt(i,2)
+            ntemp2=NearestNeighborInd(i,2)
+            ntempt2=NearestNeighborCell(i,2)
     
             rot(i,1)=rot(i,3)
-            nn(i,1)=nn(i,3)
-            nt(i,1)=nt(i,3)
+            NearestNeighborInd(i,1)=NearestNeighborInd(i,3)
+            NearestNeighborCell(i,1)=NearestNeighborCell(i,3)
             rot(i,2)=temp1
-            nn(i,2)=ntemp1
-            nt(i,2)=ntempt1
+            NearestNeighborInd(i,2)=ntemp1
+            NearestNeighborCell(i,2)=ntempt1
             rot(i,3)=temp2
-            nn(i,3)=ntemp2
-            nt(i,3)=ntempt2
+            NearestNeighborInd(i,3)=ntemp2
+            NearestNeighborCell(i,3)=ntempt2
             else
             if(rot(i,2).LT.rot(i,3))then
                 temp=rot(i,2)
-                ntemp=nn(i,2)
-                ntempt=nt(i,2)
+                ntemp=NearestNeighborInd(i,2)
+                ntempt=NearestNeighborCell(i,2)
                 rot(i,2)=rot(i,3)
-                nn(i,2)=nn(i,3)
-                nt(i,2)=nt(i,3)
+                NearestNeighborInd(i,2)=NearestNeighborInd(i,3)
+                NearestNeighborCell(i,2)=NearestNeighborCell(i,3)
                 rot(i,3)=temp
-                nn(i,3)=ntemp
-                nt(i,3)=ntempt
+                NearestNeighborInd(i,3)=ntemp
+                NearestNeighborCell(i,3)=ntempt
             endif
         endif
     
@@ -169,21 +168,21 @@ end subroutine NearestNeighbours
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-subroutine HexagonalLoops(KekuleLoops,Coords,ndim,a1,a2,ang_mat,tn)
+subroutine HexagonalLoops(KekuleLoops,Coords,ndim,a1,a2,RotMatrix,tn)
 
     integer(dp),  intent(in) :: ndim
     integer(dp), intent(out) :: KekuleLoops(ndim/2,2,3)
-    real(dp), intent(in) :: Coords(ndim,3), ang_mat(2,2), a1(2), a2(2), tn(6,2)
+    real(dp), intent(in) :: Coords(ndim,3), RotMatrix(2,2), a1(2), a2(2), tn(6,2)
 
     integer(dp) :: i,n,m, counter1, counter2
     real(dp) :: a11(2), a21(2), a12(2), a22(2), r0(2),r1(2),r2(2),r3(2),r4(2),r5(2),r6(2),tm(0:6,2)
 
     tm(1:6,:) = tn(:,:)
     tm(0,:) = [0.0_dp, 0.0_dp]
-    a11 = matmul(ang_mat,a1)
-    a21 = matmul(ang_mat,a2)
-    a12 = matmul(transpose(ang_mat),a1)
-    a22 = matmul(transpose(ang_mat),a2)
+    a11 = matmul(RotMatrix,a1)
+    a21 = matmul(RotMatrix,a2)
+    a12 = matmul(transpose(RotMatrix),a1)
+    a22 = matmul(transpose(RotMatrix),a2)
 
     KekuleLoops(:,:,:) = 0_dp
 
@@ -311,26 +310,26 @@ end subroutine HexagonalLoops
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-subroutine KekuleNeighbors(Coords,ndim,ang_mat,a1,a2,tnn,NeighborsKekule)
+subroutine KekuleNeighbors(Coords,ndim,RotMatrix,a1,a2,tnn,NeighborsKekule)
 
     integer(dp), intent(in) :: ndim
-    real(dp), intent(in) :: Coords(ndim,3), ang_mat(2,2), a1(2), a2(2), tnn(6,2)
+    real(dp), intent(in) :: Coords(ndim,3), RotMatrix(2,2), a1(2), a2(2), tnn(6,2)
     integer(dp), intent(inout) :: NeighborsKekule(ndim/2,6,2)
 
-    integer(dp) :: n,h, i, ndimq
+    integer(dp) :: n,h, i
     real(dp) :: a11(2), a21(2), a12(2), a22(2), nCoords(2), tn(0:6,2)
 
-    ndimq = ndim
+    ndim = ndim
     tn(1:6,:) = tnn(:,:)
     tn(0,1) = 0.0_dp
     tn(0,2) = 0.0_dp
 
     NeighborsKekule(:,:,:) = 0_dp
 
-    a11 = matmul(ang_mat,a1)
-    a21 = matmul(ang_mat,a2)
-    a12 = matmul(transpose(ang_mat),a1)
-    a22 = matmul(transpose(ang_mat),a2)
+    a11 = matmul(RotMatrix,a1)
+    a21 = matmul(RotMatrix,a2)
+    a12 = matmul(transpose(RotMatrix),a1)
+    a22 = matmul(transpose(RotMatrix),a2)
 
     do n=1,ndim/4
 
@@ -338,7 +337,7 @@ subroutine KekuleNeighbors(Coords,ndim,ang_mat,a1,a2,tnn,NeighborsKekule)
         NeighborsKekule(n,1,2) = 0
 
         nCoords = Coords(n,1:2) + a11/3.0 - 2.0*a21/3.0
-        do h = ndimq/4+1,ndimq/2
+        do h = ndim/4+1,ndim/2
             do i=0,6
                 if (norm2(Coords(h,1:2) + tn(i,:) - nCoords).lt.a0*.1) then
                     
@@ -349,7 +348,7 @@ subroutine KekuleNeighbors(Coords,ndim,ang_mat,a1,a2,tnn,NeighborsKekule)
         enddo
         
         nCoords = Coords(n,1:2) + a11 - a21
-        do h = 1,ndimq/4
+        do h = 1,ndim/4
             do i=0,6
                 if (norm2(Coords(h,1:2) + tn(i,:) - nCoords).lt.a0*.1) then
 
@@ -360,7 +359,7 @@ subroutine KekuleNeighbors(Coords,ndim,ang_mat,a1,a2,tnn,NeighborsKekule)
         enddo
         
         nCoords = Coords(n,1:2) + 4*a11/3.0 - 2*a21/3.0
-        do h=ndimq/4+1,ndimq/2
+        do h=ndim/4+1,ndim/2
             do i=0,6
                 if (norm2(Coords(h,1:2) + tn(i,:) - nCoords).lt.a0*.1) then
 
@@ -371,7 +370,7 @@ subroutine KekuleNeighbors(Coords,ndim,ang_mat,a1,a2,tnn,NeighborsKekule)
         enddo
         
         nCoords = Coords(n,1:2) + a11
-        do h=1,ndimq/4
+        do h=1,ndim/4
             do i=0,6
                 if (norm2(Coords(h,1:2) + tn(i,:) - nCoords).lt.a0*.1) then
 
@@ -382,7 +381,7 @@ subroutine KekuleNeighbors(Coords,ndim,ang_mat,a1,a2,tnn,NeighborsKekule)
         enddo
         
         nCoords = Coords(n,1:2) + a11/3.0 + a21/3.0
-        do h=ndimq/4+1,ndimq/2
+        do h=ndim/4+1,ndim/2
             do i=0,6
                 if (norm2(Coords(h,1:2) + tn(i,:) - nCoords).lt.a0*.1) then
 
@@ -407,7 +406,7 @@ subroutine KekuleNeighbors(Coords,ndim,ang_mat,a1,a2,tnn,NeighborsKekule)
 
 
         nCoords = Coords(n,1:2) + a12/3.0 - 2*a22/3.0
-        do h = 3*ndimq/4+1,ndimq
+        do h = 3*ndim/4+1,ndim
             do i=0,6
                 if (norm2(Coords(h,1:2) + tn(i,:) - nCoords).lt.a0*.1) then
                     NeighborsKekule(n-ndim/4,2,1) = h
@@ -417,7 +416,7 @@ subroutine KekuleNeighbors(Coords,ndim,ang_mat,a1,a2,tnn,NeighborsKekule)
         enddo
         
         nCoords = Coords(n,1:2) + a12 - a22
-        do h=ndimq/2+1,3*ndimq/4
+        do h=ndim/2+1,3*ndim/4
             do i=0,6
                 if (norm2(Coords(h,1:2) + tn(i,:) - nCoords).lt.a0*.1) then
                     NeighborsKekule(n-ndim/4,3,1) = h
@@ -427,7 +426,7 @@ subroutine KekuleNeighbors(Coords,ndim,ang_mat,a1,a2,tnn,NeighborsKekule)
         enddo
         
         nCoords = Coords(n,1:2) + 4.0*a12/3.0 - 2.0*a22/3.0
-        do h=3*ndimq/4+1,ndimq
+        do h=3*ndim/4+1,ndim
             do i=0,6
                 if (norm2(Coords(h,1:2) + tn(i,:) - nCoords).lt.a0*.1) then
                     NeighborsKekule(n-ndim/4,4,1) = h
@@ -437,7 +436,7 @@ subroutine KekuleNeighbors(Coords,ndim,ang_mat,a1,a2,tnn,NeighborsKekule)
         enddo
         
         nCoords = Coords(n,1:2) + a12
-        do h=ndimq/2+1,3*ndimq/4
+        do h=ndim/2+1,3*ndim/4
             do i=0,6
                 if (norm2(Coords(h,1:2) + tn(i,:) - nCoords).lt.a0*.1) then
                     NeighborsKekule(n-ndim/4,5,1) = h
@@ -447,7 +446,7 @@ subroutine KekuleNeighbors(Coords,ndim,ang_mat,a1,a2,tnn,NeighborsKekule)
         enddo
         
         nCoords = Coords(n,1:2) + a12/3.0 + a22/3.0
-        do h=3*ndimq/4+1,ndimq
+        do h=3*ndim/4+1,ndim
             do i=0,6
                 if (norm2(Coords(h,1:2) + tn(i,:) - nCoords).lt.a0*.1) then
                     NeighborsKekule(n-ndim/4,6,1) = h
@@ -468,10 +467,10 @@ end subroutine KekuleNeighbors
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-subroutine IntraSubIntraVal(densvp,densnorm,ndim,nn,nt,numNeighborCells,ind_j,ind_l,tnton1n2,zFock)
+subroutine IntraSubIntraVal(densvp,densnorm,ndim,NearestNeighborInd,NearestNeighborCell,numNeighborCells,nUnitCell_1,nUnitCell_2,tnton1n2,zFock)
 
     integer(dp), intent(in) :: ndim, numNeighborCells
-    integer(dp), intent(in) :: nn(ndim,3),nt(ndim,3), ind_j(numNeighborCells), ind_l(numNeighborCells), tnton1n2(0:6,2)
+    integer(dp), intent(in) :: NearestNeighborInd(ndim,3),NearestNeighborCell(ndim,3), nUnitCell_1(numNeighborCells), nUnitCell_2(numNeighborCells), tnton1n2(0:6,2)
     real(dp), intent(out) :: densvp(ndim), densnorm(ndim)
     complex(dp), intent(in) :: zFock(ndim,ndim,numNeighborCells)
     
@@ -487,58 +486,58 @@ subroutine IntraSubIntraVal(densvp,densnorm,ndim,nn,nt,numNeighborCells,ind_j,in
     do n=1,ndim
 
         if(numI.eq.0)then
-            z1 =  zFock(nn(n,1),nn(n,3),1)
-            z2 = zFock(nn(n,3),nn(n,2),1)
-            z3 = zFock(nn(n,2),nn(n,1),1)
+            z1 =  zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,3),1)
+            z2 = zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,2),1)
+            z3 = zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,1),1)
         
         else
 
-            call n1n2toind(index, -tnton1n2(nt(n,1),1) + tnton1n2(nt(n,3),1),&
-            -tnton1n2(nt(n,1),2) + tnton1n2(nt(n,3),2), ind_j, ind_l, numNeighborCells)  
+            call n1n2toind(index, -tnton1n2(NearestNeighborCell(n,1),1) + tnton1n2(NearestNeighborCell(n,3),1),&
+            -tnton1n2(NearestNeighborCell(n,1),2) + tnton1n2(NearestNeighborCell(n,3),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if (index.eq.-1_dp)then
-                call n1n2toind(index, +tnton1n2(nt(n,1),1) - tnton1n2(nt(n,3),1),&
-                +tnton1n2(nt(n,1),2) - tnton1n2(nt(n,3),2), ind_j, ind_l, numNeighborCells)
+                call n1n2toind(index, +tnton1n2(NearestNeighborCell(n,1),1) - tnton1n2(NearestNeighborCell(n,3),1),&
+                +tnton1n2(NearestNeighborCell(n,1),2) - tnton1n2(NearestNeighborCell(n,3),2), nUnitCell_1, nUnitCell_2, numNeighborCells)
                 
-                z1 = conjg(zFock(nn(n,3),nn(n,1),index))
+                z1 = conjg(zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,1),index))
             else
                 
-                z1 = zFock(nn(n,1),nn(n,3),index)
+                z1 = zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,3),index)
             endif
             
             ! if((n.eq.3*ndim/4).or.(n.eq.ndim))then
-            ! write(*,*) n,index,z1,zFock(nn(n,1),nn(n,3),1)
+            ! write(*,*) n,index,z1,zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,3),1)
             ! endif
 
-            call n1n2toind(index, -tnton1n2(nt(n,3),1) + tnton1n2(nt(n,2),1),&
-            -tnton1n2(nt(n,3),2) + tnton1n2(nt(n,2),2), ind_j, ind_l, numNeighborCells)  
+            call n1n2toind(index, -tnton1n2(NearestNeighborCell(n,3),1) + tnton1n2(NearestNeighborCell(n,2),1),&
+            -tnton1n2(NearestNeighborCell(n,3),2) + tnton1n2(NearestNeighborCell(n,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if (index.eq.-1_dp)then
-                call n1n2toind(index, +tnton1n2(nt(n,3),1) - tnton1n2(nt(n,2),1),&
-                +tnton1n2(nt(n,3),2) - tnton1n2(nt(n,2),2), ind_j, ind_l, numNeighborCells)
+                call n1n2toind(index, +tnton1n2(NearestNeighborCell(n,3),1) - tnton1n2(NearestNeighborCell(n,2),1),&
+                +tnton1n2(NearestNeighborCell(n,3),2) - tnton1n2(NearestNeighborCell(n,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)
                 
-                z2 = conjg(zFock(nn(n,2),nn(n,3),index))
+                z2 = conjg(zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,3),index))
             else
                 
-                z2 = zFock(nn(n,3),nn(n,2),index)
+                z2 = zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,2),index)
             endif
-            !write(*,*) n,index,z2,zFock(nn(n,3),nn(n,2),1)
+            !write(*,*) n,index,z2,zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,2),1)
             ! if((n.eq.3*ndim/4).or.(n.eq.ndim))then
-            ! write(*,*) n,index,z2,zFock(nn(n,3),nn(n,2),1)
+            ! write(*,*) n,index,z2,zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,2),1)
             ! endif
             
-            call n1n2toind(index, -tnton1n2(nt(n,2),1) + tnton1n2(nt(n,1),1),&
-            -tnton1n2(nt(n,2),2) + tnton1n2(nt(n,1),2), ind_j, ind_l, numNeighborCells)  
+            call n1n2toind(index, -tnton1n2(NearestNeighborCell(n,2),1) + tnton1n2(NearestNeighborCell(n,1),1),&
+            -tnton1n2(NearestNeighborCell(n,2),2) + tnton1n2(NearestNeighborCell(n,1),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if (index.eq.-1_dp)then
-                call n1n2toind(index, +tnton1n2(nt(n,2),1) - tnton1n2(nt(n,1),1),&
-                +tnton1n2(nt(n,2),2) - tnton1n2(nt(n,1),2), ind_j, ind_l, numNeighborCells)
+                call n1n2toind(index, +tnton1n2(NearestNeighborCell(n,2),1) - tnton1n2(NearestNeighborCell(n,1),1),&
+                +tnton1n2(NearestNeighborCell(n,2),2) - tnton1n2(NearestNeighborCell(n,1),2), nUnitCell_1, nUnitCell_2, numNeighborCells)
                 
-                z3 = conjg(zFock(nn(n,1),nn(n,2),index))
+                z3 = conjg(zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,2),index))
             else
                 
-                z3 = zFock(nn(n,2),nn(n,1),index)
+                z3 = zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,1),index)
             endif
-            !write(*,*) n,index,z3,zFock(nn(n,2),nn(n,1),1)
+            !write(*,*) n,index,z3,zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,1),1)
             ! if((n.eq.3*ndim/4).or.(n.eq.ndim))then
-            ! write(*,*) n,index,z3,zFock(nn(n,2),nn(n,1),1),nn(n,2),nn(n,1),nt(n,2),nt(n,1)
+            ! write(*,*) n,index,z3,zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,1),1),NearestNeighborInd(n,2),NearestNeighborInd(n,1),NearestNeighborCell(n,2),NearestNeighborCell(n,1)
             ! endif
 
         endif
@@ -573,10 +572,10 @@ end subroutine IntraSubIntraVal
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-subroutine IntraSubInterVal(fkpk,ndim,numNeighborCells,ind_j,ind_l,nn,nt,tnton1n2,zFock)
+subroutine IntraSubInterVal(fkpk,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,NearestNeighborInd,NearestNeighborCell,tnton1n2,zFock)
 
     integer(dp), intent(in) :: ndim, numNeighborCells
-    integer(dp), intent(in) :: nn(ndim,3),nt(ndim,3), tnton1n2(0:6,2), ind_j(numNeighborCells), ind_l(numNeighborCells)
+    integer(dp), intent(in) :: NearestNeighborInd(ndim,3),NearestNeighborCell(ndim,3), tnton1n2(0:6,2), nUnitCell_1(numNeighborCells), nUnitCell_2(numNeighborCells)
     complex(dp), intent(out) :: fkpk(ndim)
     complex(dp), intent(in) :: zFock(ndim,ndim,numNeighborCells)
     
@@ -593,50 +592,50 @@ subroutine IntraSubInterVal(fkpk,ndim,numNeighborCells,ind_j,ind_l,nn,nt,tnton1n
     do n=1,ndim/4
 
         if(numI.EQ.0)then
-            z1 = zFock(nn(n,1),nn(n,3),1)*z2Pi3
-            z2 = zFock(nn(n,3),nn(n,2),1)/z2Pi3
-            z3 = zFock(nn(n,2),nn(n,1),1)
+            z1 = zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,3),1)*z2Pi3
+            z2 = zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,2),1)/z2Pi3
+            z3 = zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,1),1)
             ztemp= z1 + z2 + z3
         else
 
-            call n1n2toind(index, -tnton1n2(nt(n,1),1) + tnton1n2(nt(n,3),1),&
-            -tnton1n2(nt(n,1),2) + tnton1n2(nt(n,3),2), ind_j, ind_l, numNeighborCells)  
+            call n1n2toind(index, -tnton1n2(NearestNeighborCell(n,1),1) + tnton1n2(NearestNeighborCell(n,3),1),&
+            -tnton1n2(NearestNeighborCell(n,1),2) + tnton1n2(NearestNeighborCell(n,3),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if (index.eq.-1_dp)then
-                call n1n2toind(index, +tnton1n2(nt(n,1),1) - tnton1n2(nt(n,3),1),&
-                +tnton1n2(nt(n,1),2) - tnton1n2(nt(n,3),2), ind_j, ind_l, numNeighborCells)
+                call n1n2toind(index, +tnton1n2(NearestNeighborCell(n,1),1) - tnton1n2(NearestNeighborCell(n,3),1),&
+                +tnton1n2(NearestNeighborCell(n,1),2) - tnton1n2(NearestNeighborCell(n,3),2), nUnitCell_1, nUnitCell_2, numNeighborCells)
                 
-                z1 = conjg(zFock(nn(n,3),nn(n,1),index))
+                z1 = conjg(zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,1),index))
             else
                 
-                z1 = zFock(nn(n,1),nn(n,3),index)
+                z1 = zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,3),index)
             endif
-            !write(*,*) n,index,z1,zFock(nn(n,1),nn(n,3),1)
+            !write(*,*) n,index,z1,zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,3),1)
 
-            call n1n2toind(index, -tnton1n2(nt(n,3),1) + tnton1n2(nt(n,2),1),&
-            -tnton1n2(nt(n,3),2) + tnton1n2(nt(n,2),2), ind_j, ind_l, numNeighborCells)  
+            call n1n2toind(index, -tnton1n2(NearestNeighborCell(n,3),1) + tnton1n2(NearestNeighborCell(n,2),1),&
+            -tnton1n2(NearestNeighborCell(n,3),2) + tnton1n2(NearestNeighborCell(n,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if (index.eq.-1_dp)then
-                call n1n2toind(index, +tnton1n2(nt(n,3),1) - tnton1n2(nt(n,2),1),&
-                +tnton1n2(nt(n,3),2) - tnton1n2(nt(n,2),2), ind_j, ind_l, numNeighborCells)
+                call n1n2toind(index, +tnton1n2(NearestNeighborCell(n,3),1) - tnton1n2(NearestNeighborCell(n,2),1),&
+                +tnton1n2(NearestNeighborCell(n,3),2) - tnton1n2(NearestNeighborCell(n,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)
                 
-                z2 = conjg(zFock(nn(n,2),nn(n,3),index))
+                z2 = conjg(zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,3),index))
             else
                 
-                z2 = zFock(nn(n,3),nn(n,2),index)
+                z2 = zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,2),index)
             endif
-            !write(*,*) n,index,z2,zFock(nn(n,3),nn(n,2),1)
+            !write(*,*) n,index,z2,zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,2),1)
 
-            call n1n2toind(index, -tnton1n2(nt(n,2),1) + tnton1n2(nt(n,1),1),&
-            -tnton1n2(nt(n,2),2) + tnton1n2(nt(n,1),2), ind_j, ind_l, numNeighborCells)  
+            call n1n2toind(index, -tnton1n2(NearestNeighborCell(n,2),1) + tnton1n2(NearestNeighborCell(n,1),1),&
+            -tnton1n2(NearestNeighborCell(n,2),2) + tnton1n2(NearestNeighborCell(n,1),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if (index.eq.-1_dp)then
-                call n1n2toind(index, +tnton1n2(nt(n,2),1) - tnton1n2(nt(n,1),1),&
-                +tnton1n2(nt(n,2),2) - tnton1n2(nt(n,1),2), ind_j, ind_l, numNeighborCells)
+                call n1n2toind(index, +tnton1n2(NearestNeighborCell(n,2),1) - tnton1n2(NearestNeighborCell(n,1),1),&
+                +tnton1n2(NearestNeighborCell(n,2),2) - tnton1n2(NearestNeighborCell(n,1),2), nUnitCell_1, nUnitCell_2, numNeighborCells)
                 
-                z3 = conjg(zFock(nn(n,1),nn(n,2),index))
+                z3 = conjg(zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,2),index))
             else
                 
-                z3 = zFock(nn(n,2),nn(n,1),index)
+                z3 = zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,1),index)
             endif
-            !write(*,*) n,index,z3,zFock(nn(n,2),nn(n,1),1)
+            !write(*,*) n,index,z3,zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,1),1)
 
             ztemp = z1*z2Pi3 + z2/z2Pi3 + z3
         endif
@@ -648,50 +647,50 @@ subroutine IntraSubInterVal(fkpk,ndim,numNeighborCells,ind_j,ind_l,nn,nt,tnton1n
     do n=ndim/4+1,ndim/2
 
         if(numI.eq.0)then
-            z1 = zFock(nn(n,1),nn(n,3),1)*z2Pi3
-            z2 = zFock(nn(n,3),nn(n,2),1)
-            z3 = zFock(nn(n,2),nn(n,1),1)/z2Pi3
+            z1 = zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,3),1)*z2Pi3
+            z2 = zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,2),1)
+            z3 = zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,1),1)/z2Pi3
             ztemp= z1 + z2 + z3
         else
 
-                call n1n2toind(index, -tnton1n2(nt(n,1),1) + tnton1n2(nt(n,3),1),&
-            -tnton1n2(nt(n,1),2) + tnton1n2(nt(n,3),2), ind_j, ind_l, numNeighborCells)  
+                call n1n2toind(index, -tnton1n2(NearestNeighborCell(n,1),1) + tnton1n2(NearestNeighborCell(n,3),1),&
+            -tnton1n2(NearestNeighborCell(n,1),2) + tnton1n2(NearestNeighborCell(n,3),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if (index.eq.-1_dp)then
-                call n1n2toind(index, +tnton1n2(nt(n,1),1) - tnton1n2(nt(n,3),1),&
-                +tnton1n2(nt(n,1),2) - tnton1n2(nt(n,3),2), ind_j, ind_l, numNeighborCells)
+                call n1n2toind(index, +tnton1n2(NearestNeighborCell(n,1),1) - tnton1n2(NearestNeighborCell(n,3),1),&
+                +tnton1n2(NearestNeighborCell(n,1),2) - tnton1n2(NearestNeighborCell(n,3),2), nUnitCell_1, nUnitCell_2, numNeighborCells)
                 
-                z1 = conjg(zFock(nn(n,3),nn(n,1),index))
+                z1 = conjg(zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,1),index))
             else
                 
-                z1 = zFock(nn(n,1),nn(n,3),index)
+                z1 = zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,3),index)
             endif
-            !write(*,*) n,index,z1,zFock(nn(n,1),nn(n,3),1)
+            !write(*,*) n,index,z1,zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,3),1)
 
-            call n1n2toind(index, -tnton1n2(nt(n,3),1) + tnton1n2(nt(n,2),1),&
-            -tnton1n2(nt(n,3),2) + tnton1n2(nt(n,2),2), ind_j, ind_l, numNeighborCells)  
+            call n1n2toind(index, -tnton1n2(NearestNeighborCell(n,3),1) + tnton1n2(NearestNeighborCell(n,2),1),&
+            -tnton1n2(NearestNeighborCell(n,3),2) + tnton1n2(NearestNeighborCell(n,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if (index.eq.-1_dp)then
-                call n1n2toind(index, +tnton1n2(nt(n,3),1) - tnton1n2(nt(n,2),1),&
-                +tnton1n2(nt(n,3),2) - tnton1n2(nt(n,2),2), ind_j, ind_l, numNeighborCells)
+                call n1n2toind(index, +tnton1n2(NearestNeighborCell(n,3),1) - tnton1n2(NearestNeighborCell(n,2),1),&
+                +tnton1n2(NearestNeighborCell(n,3),2) - tnton1n2(NearestNeighborCell(n,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)
                 
-                z2 = conjg(zFock(nn(n,2),nn(n,3),index))
+                z2 = conjg(zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,3),index))
             else
                 
-                z2 = zFock(nn(n,3),nn(n,2),index)
+                z2 = zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,2),index)
             endif
-            !write(*,*) n,index,z2,zFock(nn(n,3),nn(n,2),1)
+            !write(*,*) n,index,z2,zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,2),1)
 
-            call n1n2toind(index, -tnton1n2(nt(n,2),1) + tnton1n2(nt(n,1),1),&
-            -tnton1n2(nt(n,2),2) + tnton1n2(nt(n,1),2), ind_j, ind_l, numNeighborCells)  
+            call n1n2toind(index, -tnton1n2(NearestNeighborCell(n,2),1) + tnton1n2(NearestNeighborCell(n,1),1),&
+            -tnton1n2(NearestNeighborCell(n,2),2) + tnton1n2(NearestNeighborCell(n,1),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if (index.eq.-1_dp)then
-                call n1n2toind(index, +tnton1n2(nt(n,2),1) - tnton1n2(nt(n,1),1),&
-                +tnton1n2(nt(n,2),2) - tnton1n2(nt(n,1),2), ind_j, ind_l, numNeighborCells)
+                call n1n2toind(index, +tnton1n2(NearestNeighborCell(n,2),1) - tnton1n2(NearestNeighborCell(n,1),1),&
+                +tnton1n2(NearestNeighborCell(n,2),2) - tnton1n2(NearestNeighborCell(n,1),2), nUnitCell_1, nUnitCell_2, numNeighborCells)
                 
-                z3 = conjg(zFock(nn(n,1),nn(n,2),index))
+                z3 = conjg(zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,2),index))
             else
                 
-                z3 = zFock(nn(n,2),nn(n,1),index)
+                z3 = zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,1),index)
             endif
-            !write(*,*) n,index,z3,zFock(nn(n,2),nn(n,1),1)
+            !write(*,*) n,index,z3,zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,1),1)
 
             ztemp = z1*z2Pi3 + z2 + z3/z2Pi3
 
@@ -704,50 +703,50 @@ subroutine IntraSubInterVal(fkpk,ndim,numNeighborCells,ind_j,ind_l,nn,nt,tnton1n
     do n=ndim/2+1,3*ndim/4
 
         if(numI.eq.0)then
-            z1 = zFock(nn(n,1),nn(n,3),1)*z2Pi3
-            z2 = zFock(nn(n,3),nn(n,2),1)/z2Pi3
-            z3 = zFock(nn(n,2),nn(n,1),1)
+            z1 = zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,3),1)*z2Pi3
+            z2 = zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,2),1)/z2Pi3
+            z3 = zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,1),1)
             ztemp = z1 + z2 + z3
 
         else
-            call n1n2toind(index, -tnton1n2(nt(n,1),1) + tnton1n2(nt(n,3),1),&
-            -tnton1n2(nt(n,1),2) + tnton1n2(nt(n,3),2), ind_j, ind_l, numNeighborCells)  
+            call n1n2toind(index, -tnton1n2(NearestNeighborCell(n,1),1) + tnton1n2(NearestNeighborCell(n,3),1),&
+            -tnton1n2(NearestNeighborCell(n,1),2) + tnton1n2(NearestNeighborCell(n,3),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if (index.eq.-1_dp)then
-                call n1n2toind(index, +tnton1n2(nt(n,1),1) - tnton1n2(nt(n,3),1),&
-                +tnton1n2(nt(n,1),2) - tnton1n2(nt(n,3),2), ind_j, ind_l, numNeighborCells)
+                call n1n2toind(index, +tnton1n2(NearestNeighborCell(n,1),1) - tnton1n2(NearestNeighborCell(n,3),1),&
+                +tnton1n2(NearestNeighborCell(n,1),2) - tnton1n2(NearestNeighborCell(n,3),2), nUnitCell_1, nUnitCell_2, numNeighborCells)
                 
-                z1 = conjg(zFock(nn(n,3),nn(n,1),index))
+                z1 = conjg(zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,1),index))
             else
                 
-                z1 = zFock(nn(n,1),nn(n,3),index)
+                z1 = zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,3),index)
             endif
-            !write(*,*) n,index,z1,zFock(nn(n,1),nn(n,3),1)
+            !write(*,*) n,index,z1,zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,3),1)
 
-            call n1n2toind(index, -tnton1n2(nt(n,3),1) + tnton1n2(nt(n,2),1),&
-            -tnton1n2(nt(n,3),2) + tnton1n2(nt(n,2),2), ind_j, ind_l, numNeighborCells)  
+            call n1n2toind(index, -tnton1n2(NearestNeighborCell(n,3),1) + tnton1n2(NearestNeighborCell(n,2),1),&
+            -tnton1n2(NearestNeighborCell(n,3),2) + tnton1n2(NearestNeighborCell(n,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if (index.eq.-1_dp)then
-                call n1n2toind(index, +tnton1n2(nt(n,3),1) - tnton1n2(nt(n,2),1),&
-                +tnton1n2(nt(n,3),2) - tnton1n2(nt(n,2),2), ind_j, ind_l, numNeighborCells)
+                call n1n2toind(index, +tnton1n2(NearestNeighborCell(n,3),1) - tnton1n2(NearestNeighborCell(n,2),1),&
+                +tnton1n2(NearestNeighborCell(n,3),2) - tnton1n2(NearestNeighborCell(n,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)
                 
-                z2 = conjg(zFock(nn(n,2),nn(n,3),index))
+                z2 = conjg(zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,3),index))
             else
                 
-                z2 = zFock(nn(n,3),nn(n,2),index)
+                z2 = zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,2),index)
             endif
-            !write(*,*) n,index,z2,zFock(nn(n,3),nn(n,2),1)
+            !write(*,*) n,index,z2,zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,2),1)
 
-            call n1n2toind(index, -tnton1n2(nt(n,2),1) + tnton1n2(nt(n,1),1),&
-            -tnton1n2(nt(n,2),2) + tnton1n2(nt(n,1),2), ind_j, ind_l, numNeighborCells)  
+            call n1n2toind(index, -tnton1n2(NearestNeighborCell(n,2),1) + tnton1n2(NearestNeighborCell(n,1),1),&
+            -tnton1n2(NearestNeighborCell(n,2),2) + tnton1n2(NearestNeighborCell(n,1),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if (index.eq.-1_dp)then
-                call n1n2toind(index, +tnton1n2(nt(n,2),1) - tnton1n2(nt(n,1),1),&
-                +tnton1n2(nt(n,2),2) - tnton1n2(nt(n,1),2), ind_j, ind_l, numNeighborCells)
+                call n1n2toind(index, +tnton1n2(NearestNeighborCell(n,2),1) - tnton1n2(NearestNeighborCell(n,1),1),&
+                +tnton1n2(NearestNeighborCell(n,2),2) - tnton1n2(NearestNeighborCell(n,1),2), nUnitCell_1, nUnitCell_2, numNeighborCells)
                 
-                z3 = conjg(zFock(nn(n,1),nn(n,2),index))
+                z3 = conjg(zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,2),index))
             else
                 
-                z3 = zFock(nn(n,2),nn(n,1),index)
+                z3 = zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,1),index)
             endif
-            !write(*,*) n,index,z3,zFock(nn(n,2),nn(n,1),1)
+            !write(*,*) n,index,z3,zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,1),1)
 
             ztemp = z1*z2Pi3 + z2/z2Pi3 + z3
         endif
@@ -758,50 +757,50 @@ subroutine IntraSubInterVal(fkpk,ndim,numNeighborCells,ind_j,ind_l,nn,nt,tnton1n
     do n=3*ndim/4+1,ndim
 
         if (numI.eq.0) then
-            z1 = zFock(nn(n,1),nn(n,3),1)*z2Pi3
-            z2 = zFock(nn(n,3),nn(n,2),1)
-            z3 = zFock(nn(n,2),nn(n,1),1)/z2Pi3
+            z1 = zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,3),1)*z2Pi3
+            z2 = zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,2),1)
+            z3 = zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,1),1)/z2Pi3
             ztemp = z1 + z2 + z3
         else
 
-            call n1n2toind(index, -tnton1n2(nt(n,1),1) + tnton1n2(nt(n,3),1),&
-            -tnton1n2(nt(n,1),2) + tnton1n2(nt(n,3),2), ind_j, ind_l, numNeighborCells)  
+            call n1n2toind(index, -tnton1n2(NearestNeighborCell(n,1),1) + tnton1n2(NearestNeighborCell(n,3),1),&
+            -tnton1n2(NearestNeighborCell(n,1),2) + tnton1n2(NearestNeighborCell(n,3),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if (index.eq.-1_dp)then
-                call n1n2toind(index, +tnton1n2(nt(n,1),1) - tnton1n2(nt(n,3),1),&
-                +tnton1n2(nt(n,1),2) - tnton1n2(nt(n,3),2), ind_j, ind_l, numNeighborCells)
+                call n1n2toind(index, +tnton1n2(NearestNeighborCell(n,1),1) - tnton1n2(NearestNeighborCell(n,3),1),&
+                +tnton1n2(NearestNeighborCell(n,1),2) - tnton1n2(NearestNeighborCell(n,3),2), nUnitCell_1, nUnitCell_2, numNeighborCells)
                 
-                z1 = conjg(zFock(nn(n,3),nn(n,1),index))
+                z1 = conjg(zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,1),index))
             else
                 
-                z1 = zFock(nn(n,1),nn(n,3),index)
+                z1 = zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,3),index)
             endif
-            !write(*,*) n,index,z1,zFock(nn(n,1),nn(n,3),1)
+            !write(*,*) n,index,z1,zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,3),1)
 
-            call n1n2toind(index, -tnton1n2(nt(n,3),1) + tnton1n2(nt(n,2),1),&
-            -tnton1n2(nt(n,3),2) + tnton1n2(nt(n,2),2), ind_j, ind_l, numNeighborCells)  
+            call n1n2toind(index, -tnton1n2(NearestNeighborCell(n,3),1) + tnton1n2(NearestNeighborCell(n,2),1),&
+            -tnton1n2(NearestNeighborCell(n,3),2) + tnton1n2(NearestNeighborCell(n,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if (index.eq.-1_dp)then
-                call n1n2toind(index, +tnton1n2(nt(n,3),1) - tnton1n2(nt(n,2),1),&
-                +tnton1n2(nt(n,3),2) - tnton1n2(nt(n,2),2), ind_j, ind_l, numNeighborCells)
+                call n1n2toind(index, +tnton1n2(NearestNeighborCell(n,3),1) - tnton1n2(NearestNeighborCell(n,2),1),&
+                +tnton1n2(NearestNeighborCell(n,3),2) - tnton1n2(NearestNeighborCell(n,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)
                 
-                z2 = conjg(zFock(nn(n,2),nn(n,3),index))
+                z2 = conjg(zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,3),index))
             else
                 
-                z2 = zFock(nn(n,3),nn(n,2),index)
+                z2 = zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,2),index)
             endif
-            !write(*,*) n,index,z2,zFock(nn(n,3),nn(n,2),1)
+            !write(*,*) n,index,z2,zFock(NearestNeighborInd(n,3),NearestNeighborInd(n,2),1)
 
-            call n1n2toind(index, -tnton1n2(nt(n,2),1) + tnton1n2(nt(n,1),1),&
-            -tnton1n2(nt(n,2),2) + tnton1n2(nt(n,1),2), ind_j, ind_l, numNeighborCells)  
+            call n1n2toind(index, -tnton1n2(NearestNeighborCell(n,2),1) + tnton1n2(NearestNeighborCell(n,1),1),&
+            -tnton1n2(NearestNeighborCell(n,2),2) + tnton1n2(NearestNeighborCell(n,1),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if (index.eq.-1_dp)then
-                call n1n2toind(index, +tnton1n2(nt(n,2),1) - tnton1n2(nt(n,1),1),&
-                +tnton1n2(nt(n,2),2) - tnton1n2(nt(n,1),2), ind_j, ind_l, numNeighborCells)
+                call n1n2toind(index, +tnton1n2(NearestNeighborCell(n,2),1) - tnton1n2(NearestNeighborCell(n,1),1),&
+                +tnton1n2(NearestNeighborCell(n,2),2) - tnton1n2(NearestNeighborCell(n,1),2), nUnitCell_1, nUnitCell_2, numNeighborCells)
                 
-                z3 = conjg(zFock(nn(n,1),nn(n,2),index))
+                z3 = conjg(zFock(NearestNeighborInd(n,1),NearestNeighborInd(n,2),index))
             else
                 
-                z3 = zFock(nn(n,2),nn(n,1),index)
+                z3 = zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,1),index)
             endif
-            !write(*,*) n,index,z3,zFock(nn(n,2),nn(n,1),1)
+            !write(*,*) n,index,z3,zFock(NearestNeighborInd(n,2),NearestNeighborInd(n,1),1)
             
             ztemp = z1*z2Pi3 + z2 + z3/z2Pi3
         endif
@@ -814,10 +813,10 @@ end subroutine IntraSubInterVal
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-subroutine InterSubInterVal(fkakpb,fkbkpa,NeighborsKekule,KekuleLoops,ndim,numNeighborCells,ind_j,ind_l,tnton1n2,zFock)
+subroutine InterSubInterVal(fkakpb,fkbkpa,NeighborsKekule,KekuleLoops,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,tnton1n2,zFock)
 
     integer(dp), intent(in) :: ndim, numNeighborCells
-    integer(dp), intent(in) :: ind_j(numNeighborCells), ind_l(numNeighborCells), tnton1n2(0:6,2)
+    integer(dp), intent(in) :: nUnitCell_1(numNeighborCells), nUnitCell_2(numNeighborCells), tnton1n2(0:6,2)
     integer(dp), intent(in) :: NeighborsKekule(ndim/2,6,2), KekuleLoops(ndim/2,2,3)
     complex(dp), intent(out) :: fkakpb(ndim/2), fkbkpa(ndim/2)
     complex(dp), intent(in) :: zFock(ndim,ndim,numNeighborCells)
@@ -848,10 +847,10 @@ subroutine InterSubInterVal(fkakpb,fkbkpa,NeighborsKekule,KekuleLoops,ndim,numNe
         else
 
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,1,2),1) - tnton1n2(NeighborsKekule(n,2,2),1),&
-                tnton1n2(NeighborsKekule(n,1,2),2) - tnton1n2(NeighborsKekule(n,2,2),2), ind_j, ind_l, numNeighborCells)  
+                tnton1n2(NeighborsKekule(n,1,2),2) - tnton1n2(NeighborsKekule(n,2,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,1,2),1) + tnton1n2(NeighborsKekule(n,2,2),1),&
-                -tnton1n2(NeighborsKekule(n,1,2),2) + tnton1n2(NeighborsKekule(n,2,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,1,2),2) + tnton1n2(NeighborsKekule(n,2,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z1 = conjg(zFock(NeighborsKekule(n,2,1),NeighborsKekule(n,1,1),index))
             else
@@ -860,10 +859,10 @@ subroutine InterSubInterVal(fkakpb,fkbkpa,NeighborsKekule,KekuleLoops,ndim,numNe
             endif
 
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,2,2),1) - tnton1n2(NeighborsKekule(n,3,2),1),&
-                tnton1n2(NeighborsKekule(n,2,2),2) - tnton1n2(NeighborsKekule(n,3,2),2), ind_j, ind_l, numNeighborCells)  
+                tnton1n2(NeighborsKekule(n,2,2),2) - tnton1n2(NeighborsKekule(n,3,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,2,2),1) + tnton1n2(NeighborsKekule(n,3,2),1),&
-                -tnton1n2(NeighborsKekule(n,2,2),2) + tnton1n2(NeighborsKekule(n,3,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,2,2),2) + tnton1n2(NeighborsKekule(n,3,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z2 = conjg(zFock(NeighborsKekule(n,3,1),NeighborsKekule(n,2,1),index))
             else
@@ -872,10 +871,10 @@ subroutine InterSubInterVal(fkakpb,fkbkpa,NeighborsKekule,KekuleLoops,ndim,numNe
             endif
             
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,3,2),1) - tnton1n2(NeighborsKekule(n,4,2),1),&
-                tnton1n2(NeighborsKekule(n,3,2),2) - tnton1n2(NeighborsKekule(n,4,2),2), ind_j, ind_l, numNeighborCells)  
+                tnton1n2(NeighborsKekule(n,3,2),2) - tnton1n2(NeighborsKekule(n,4,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,3,2),1) + tnton1n2(NeighborsKekule(n,4,2),1),&
-                -tnton1n2(NeighborsKekule(n,3,2),2) + tnton1n2(NeighborsKekule(n,4,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,3,2),2) + tnton1n2(NeighborsKekule(n,4,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z3 = conjg(zFock(NeighborsKekule(n,4,1),NeighborsKekule(n,3,1),index))
             else
@@ -884,10 +883,10 @@ subroutine InterSubInterVal(fkakpb,fkbkpa,NeighborsKekule,KekuleLoops,ndim,numNe
             endif
             
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,4,2),1) - tnton1n2(NeighborsKekule(n,5,2),1),&
-            tnton1n2(NeighborsKekule(n,4,2),2) - tnton1n2(NeighborsKekule(n,5,2),2), ind_j, ind_l, numNeighborCells)  
+            tnton1n2(NeighborsKekule(n,4,2),2) - tnton1n2(NeighborsKekule(n,5,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,4,2),1) + tnton1n2(NeighborsKekule(n,5,2),1),&
-                -tnton1n2(NeighborsKekule(n,4,2),2) + tnton1n2(NeighborsKekule(n,5,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,4,2),2) + tnton1n2(NeighborsKekule(n,5,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z4 = conjg(zFock(NeighborsKekule(n,5,1),NeighborsKekule(n,4,1),index))
             else
@@ -896,10 +895,10 @@ subroutine InterSubInterVal(fkakpb,fkbkpa,NeighborsKekule,KekuleLoops,ndim,numNe
             endif
             
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,5,2),1) - tnton1n2(NeighborsKekule(n,6,2),1),&
-            tnton1n2(NeighborsKekule(n,5,2),2) - tnton1n2(NeighborsKekule(n,6,2),2), ind_j, ind_l, numNeighborCells)  
+            tnton1n2(NeighborsKekule(n,5,2),2) - tnton1n2(NeighborsKekule(n,6,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,5,2),1) + tnton1n2(NeighborsKekule(n,6,2),1),&
-                -tnton1n2(NeighborsKekule(n,5,2),2) + tnton1n2(NeighborsKekule(n,6,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,5,2),2) + tnton1n2(NeighborsKekule(n,6,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z5 = conjg(zFock(NeighborsKekule(n,6,1),NeighborsKekule(n,5,1),index))
             else
@@ -908,10 +907,10 @@ subroutine InterSubInterVal(fkakpb,fkbkpa,NeighborsKekule,KekuleLoops,ndim,numNe
             endif
             
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,6,2),1) - tnton1n2(NeighborsKekule(n,1,2),1),&
-            tnton1n2(NeighborsKekule(n,6,2),2) - tnton1n2(NeighborsKekule(n,1,2),2), ind_j, ind_l, numNeighborCells)  
+            tnton1n2(NeighborsKekule(n,6,2),2) - tnton1n2(NeighborsKekule(n,1,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,6,2),1) + tnton1n2(NeighborsKekule(n,1,2),1),&
-                -tnton1n2(NeighborsKekule(n,6,2),2) + tnton1n2(NeighborsKekule(n,1,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,6,2),2) + tnton1n2(NeighborsKekule(n,1,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z6 = conjg(zFock(NeighborsKekule(n,1,1),NeighborsKekule(n,6,1),index))
             else
@@ -971,10 +970,10 @@ end subroutine InterSubInterVal
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-subroutine InterSubIntraVal_old(fkakb,fkpakpb,NeighborsKekule,KekuleLoops,ndim,numNeighborCells,ind_j,ind_l,tnton1n2,zFock)
+subroutine InterSubIntraVal_old(fkakb,fkpakpb,NeighborsKekule,KekuleLoops,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,tnton1n2,zFock)
 
     integer(dp), intent(in) :: ndim,numNeighborCells
-    integer(dp), intent(in) :: ind_j(numNeighborCells), ind_l(numNeighborCells)
+    integer(dp), intent(in) :: nUnitCell_1(numNeighborCells), nUnitCell_2(numNeighborCells)
     integer(dp), intent(in) :: NeighborsKekule(ndim/2,6,2), KekuleLoops(ndim/2,2,3), tnton1n2(0:6,2)
     complex(dp), intent(out) :: fkakb(ndim/2), fkpakpb(ndim/2)
     complex(dp), intent(in) :: zFock(ndim,ndim,numNeighborCells)
@@ -1004,10 +1003,10 @@ subroutine InterSubIntraVal_old(fkakb,fkpakpb,NeighborsKekule,KekuleLoops,ndim,n
         else
 
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,1,2),1) - tnton1n2(NeighborsKekule(n,2,2),1),&
-                tnton1n2(NeighborsKekule(n,1,2),2) - tnton1n2(NeighborsKekule(n,2,2),2), ind_j, ind_l, numNeighborCells)  
+                tnton1n2(NeighborsKekule(n,1,2),2) - tnton1n2(NeighborsKekule(n,2,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,1,2),1) + tnton1n2(NeighborsKekule(n,2,2),1),&
-                -tnton1n2(NeighborsKekule(n,1,2),2) + tnton1n2(NeighborsKekule(n,2,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,1,2),2) + tnton1n2(NeighborsKekule(n,2,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z1 = conjg(zFock(NeighborsKekule(n,2,1),NeighborsKekule(n,1,1),index))
             else
@@ -1017,10 +1016,10 @@ subroutine InterSubIntraVal_old(fkakb,fkpakpb,NeighborsKekule,KekuleLoops,ndim,n
             ! write(*,*) index
 
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,2,2),1) - tnton1n2(NeighborsKekule(n,3,2),1),&
-                tnton1n2(NeighborsKekule(n,2,2),2) - tnton1n2(NeighborsKekule(n,3,2),2), ind_j, ind_l, numNeighborCells)  
+                tnton1n2(NeighborsKekule(n,2,2),2) - tnton1n2(NeighborsKekule(n,3,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,2,2),1) + tnton1n2(NeighborsKekule(n,3,2),1),&
-                -tnton1n2(NeighborsKekule(n,2,2),2) + tnton1n2(NeighborsKekule(n,3,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,2,2),2) + tnton1n2(NeighborsKekule(n,3,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z2 = conjg(zFock(NeighborsKekule(n,3,1),NeighborsKekule(n,2,1),index))
             else
@@ -1031,10 +1030,10 @@ subroutine InterSubIntraVal_old(fkakb,fkpakpb,NeighborsKekule,KekuleLoops,ndim,n
 
             
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,3,2),1) - tnton1n2(NeighborsKekule(n,4,2),1),&
-                tnton1n2(NeighborsKekule(n,3,2),2) - tnton1n2(NeighborsKekule(n,4,2),2), ind_j, ind_l, numNeighborCells)  
+                tnton1n2(NeighborsKekule(n,3,2),2) - tnton1n2(NeighborsKekule(n,4,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,3,2),1) + tnton1n2(NeighborsKekule(n,4,2),1),&
-                -tnton1n2(NeighborsKekule(n,3,2),2) + tnton1n2(NeighborsKekule(n,4,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,3,2),2) + tnton1n2(NeighborsKekule(n,4,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z3 = conjg(zFock(NeighborsKekule(n,4,1),NeighborsKekule(n,3,1),index))
             else
@@ -1045,10 +1044,10 @@ subroutine InterSubIntraVal_old(fkakb,fkpakpb,NeighborsKekule,KekuleLoops,ndim,n
 
             
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,4,2),1) - tnton1n2(NeighborsKekule(n,5,2),1),&
-            tnton1n2(NeighborsKekule(n,4,2),2) - tnton1n2(NeighborsKekule(n,5,2),2), ind_j, ind_l, numNeighborCells)  
+            tnton1n2(NeighborsKekule(n,4,2),2) - tnton1n2(NeighborsKekule(n,5,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,4,2),1) + tnton1n2(NeighborsKekule(n,5,2),1),&
-                -tnton1n2(NeighborsKekule(n,4,2),2) + tnton1n2(NeighborsKekule(n,5,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,4,2),2) + tnton1n2(NeighborsKekule(n,5,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z4 = conjg(zFock(NeighborsKekule(n,5,1),NeighborsKekule(n,4,1),index))
             else
@@ -1059,10 +1058,10 @@ subroutine InterSubIntraVal_old(fkakb,fkpakpb,NeighborsKekule,KekuleLoops,ndim,n
 
             
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,5,2),1) - tnton1n2(NeighborsKekule(n,6,2),1),&
-            tnton1n2(NeighborsKekule(n,5,2),2) - tnton1n2(NeighborsKekule(n,6,2),2), ind_j, ind_l, numNeighborCells)  
+            tnton1n2(NeighborsKekule(n,5,2),2) - tnton1n2(NeighborsKekule(n,6,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,5,2),1) + tnton1n2(NeighborsKekule(n,6,2),1),&
-                -tnton1n2(NeighborsKekule(n,5,2),2) + tnton1n2(NeighborsKekule(n,6,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,5,2),2) + tnton1n2(NeighborsKekule(n,6,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z5 = conjg(zFock(NeighborsKekule(n,6,1),NeighborsKekule(n,5,1),index))
             else
@@ -1073,10 +1072,10 @@ subroutine InterSubIntraVal_old(fkakb,fkpakpb,NeighborsKekule,KekuleLoops,ndim,n
 
             
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,6,2),1) - tnton1n2(NeighborsKekule(n,1,2),1),&
-            tnton1n2(NeighborsKekule(n,6,2),2) - tnton1n2(NeighborsKekule(n,1,2),2), ind_j, ind_l, numNeighborCells)  
+            tnton1n2(NeighborsKekule(n,6,2),2) - tnton1n2(NeighborsKekule(n,1,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,6,2),1) + tnton1n2(NeighborsKekule(n,1,2),1),&
-                -tnton1n2(NeighborsKekule(n,6,2),2) + tnton1n2(NeighborsKekule(n,1,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,6,2),2) + tnton1n2(NeighborsKekule(n,1,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z6 = conjg(zFock(NeighborsKekule(n,1,1),NeighborsKekule(n,6,1),index))
             else
@@ -1114,10 +1113,10 @@ end subroutine InterSubIntraVal_old
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-subroutine InterSubIntraVal(fkakb,fkpakpb,NeighborsKekule,KekuleLoops,ndim,numNeighborCells,ind_j,ind_l,tnton1n2,zFock)
+subroutine InterSubIntraVal(fkakb,fkpakpb,NeighborsKekule,KekuleLoops,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,tnton1n2,zFock)
 
     integer(dp), intent(in) :: ndim,numNeighborCells
-    integer(dp), intent(in) :: ind_j(numNeighborCells), ind_l(numNeighborCells)
+    integer(dp), intent(in) :: nUnitCell_1(numNeighborCells), nUnitCell_2(numNeighborCells)
     integer(dp), intent(in) :: NeighborsKekule(ndim/2,6,2), KekuleLoops(ndim/2,2,3), tnton1n2(0:6,2)
     complex(dp), intent(out) :: fkakb(ndim/2), fkpakpb(ndim/2)
     complex(dp), intent(in) :: zFock(ndim,ndim,numNeighborCells)
@@ -1147,10 +1146,10 @@ subroutine InterSubIntraVal(fkakb,fkpakpb,NeighborsKekule,KekuleLoops,ndim,numNe
         else
 
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,1,2),1) - tnton1n2(NeighborsKekule(n,2,2),1),&
-                tnton1n2(NeighborsKekule(n,1,2),2) - tnton1n2(NeighborsKekule(n,2,2),2), ind_j, ind_l, numNeighborCells)  
+                tnton1n2(NeighborsKekule(n,1,2),2) - tnton1n2(NeighborsKekule(n,2,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,1,2),1) + tnton1n2(NeighborsKekule(n,2,2),1),&
-                -tnton1n2(NeighborsKekule(n,1,2),2) + tnton1n2(NeighborsKekule(n,2,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,1,2),2) + tnton1n2(NeighborsKekule(n,2,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z1 = conjg(zFock(NeighborsKekule(n,2,1),NeighborsKekule(n,1,1),index))
             else
@@ -1160,10 +1159,10 @@ subroutine InterSubIntraVal(fkakb,fkpakpb,NeighborsKekule,KekuleLoops,ndim,numNe
             ! write(*,*) index
 
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,2,2),1) - tnton1n2(NeighborsKekule(n,3,2),1),&
-                tnton1n2(NeighborsKekule(n,2,2),2) - tnton1n2(NeighborsKekule(n,3,2),2), ind_j, ind_l, numNeighborCells)  
+                tnton1n2(NeighborsKekule(n,2,2),2) - tnton1n2(NeighborsKekule(n,3,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,2,2),1) + tnton1n2(NeighborsKekule(n,3,2),1),&
-                -tnton1n2(NeighborsKekule(n,2,2),2) + tnton1n2(NeighborsKekule(n,3,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,2,2),2) + tnton1n2(NeighborsKekule(n,3,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z2 = conjg(zFock(NeighborsKekule(n,3,1),NeighborsKekule(n,2,1),index))
             else
@@ -1174,10 +1173,10 @@ subroutine InterSubIntraVal(fkakb,fkpakpb,NeighborsKekule,KekuleLoops,ndim,numNe
 
             
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,3,2),1) - tnton1n2(NeighborsKekule(n,4,2),1),&
-                tnton1n2(NeighborsKekule(n,3,2),2) - tnton1n2(NeighborsKekule(n,4,2),2), ind_j, ind_l, numNeighborCells)  
+                tnton1n2(NeighborsKekule(n,3,2),2) - tnton1n2(NeighborsKekule(n,4,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,3,2),1) + tnton1n2(NeighborsKekule(n,4,2),1),&
-                -tnton1n2(NeighborsKekule(n,3,2),2) + tnton1n2(NeighborsKekule(n,4,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,3,2),2) + tnton1n2(NeighborsKekule(n,4,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z3 = conjg(zFock(NeighborsKekule(n,4,1),NeighborsKekule(n,3,1),index))
             else
@@ -1188,10 +1187,10 @@ subroutine InterSubIntraVal(fkakb,fkpakpb,NeighborsKekule,KekuleLoops,ndim,numNe
 
             
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,4,2),1) - tnton1n2(NeighborsKekule(n,5,2),1),&
-            tnton1n2(NeighborsKekule(n,4,2),2) - tnton1n2(NeighborsKekule(n,5,2),2), ind_j, ind_l, numNeighborCells)  
+            tnton1n2(NeighborsKekule(n,4,2),2) - tnton1n2(NeighborsKekule(n,5,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,4,2),1) + tnton1n2(NeighborsKekule(n,5,2),1),&
-                -tnton1n2(NeighborsKekule(n,4,2),2) + tnton1n2(NeighborsKekule(n,5,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,4,2),2) + tnton1n2(NeighborsKekule(n,5,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z4 = conjg(zFock(NeighborsKekule(n,5,1),NeighborsKekule(n,4,1),index))
             else
@@ -1202,10 +1201,10 @@ subroutine InterSubIntraVal(fkakb,fkpakpb,NeighborsKekule,KekuleLoops,ndim,numNe
 
             
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,5,2),1) - tnton1n2(NeighborsKekule(n,6,2),1),&
-            tnton1n2(NeighborsKekule(n,5,2),2) - tnton1n2(NeighborsKekule(n,6,2),2), ind_j, ind_l, numNeighborCells)  
+            tnton1n2(NeighborsKekule(n,5,2),2) - tnton1n2(NeighborsKekule(n,6,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,5,2),1) + tnton1n2(NeighborsKekule(n,6,2),1),&
-                -tnton1n2(NeighborsKekule(n,5,2),2) + tnton1n2(NeighborsKekule(n,6,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,5,2),2) + tnton1n2(NeighborsKekule(n,6,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z5 = conjg(zFock(NeighborsKekule(n,6,1),NeighborsKekule(n,5,1),index))
             else
@@ -1216,10 +1215,10 @@ subroutine InterSubIntraVal(fkakb,fkpakpb,NeighborsKekule,KekuleLoops,ndim,numNe
 
             
             call n1n2toind(index, tnton1n2(NeighborsKekule(n,6,2),1) - tnton1n2(NeighborsKekule(n,1,2),1),&
-            tnton1n2(NeighborsKekule(n,6,2),2) - tnton1n2(NeighborsKekule(n,1,2),2), ind_j, ind_l, numNeighborCells)  
+            tnton1n2(NeighborsKekule(n,6,2),2) - tnton1n2(NeighborsKekule(n,1,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells)  
             if(index.eq.-1_dp)then
                 call n1n2toind(index, -tnton1n2(NeighborsKekule(n,6,2),1) + tnton1n2(NeighborsKekule(n,1,2),1),&
-                -tnton1n2(NeighborsKekule(n,6,2),2) + tnton1n2(NeighborsKekule(n,1,2),2), ind_j, ind_l, numNeighborCells) 
+                -tnton1n2(NeighborsKekule(n,6,2),2) + tnton1n2(NeighborsKekule(n,1,2),2), nUnitCell_1, nUnitCell_2, numNeighborCells) 
 
                 z6 = conjg(zFock(NeighborsKekule(n,1,1),NeighborsKekule(n,6,1),index))
             else

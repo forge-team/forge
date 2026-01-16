@@ -1104,7 +1104,7 @@ subroutine GetFockEnergy(fsum,Coords,zFock,nUnitCell_1,nUnitCell_2,ndim,numNeigh
     complex(dp), intent(in)  :: zFock(ndim,ndim,numNeighborCells)
     real(dp), intent(out) :: fsum
 
-    integer(dp) :: i, j, nt, icount, n1, n2
+    integer(dp) :: i, j, icount, n1, n2
     real(dp)    :: rij
     complex(dp) :: zsum
 
