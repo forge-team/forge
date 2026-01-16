@@ -2,6 +2,7 @@ module TightBinding
 
 use Setup
 use lapack_routines
+use Geometry
 
 implicit none
 
@@ -10,11 +11,11 @@ contains
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-subroutine TightBindingHamiltonian(zH,Delta,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,tn)
+subroutine TightBindingHamiltonian(zH,Delta,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,LatticeVectors)
  
  integer(dp), intent(in)    :: ndim,numNeighborCells
  integer(dp), intent(in)    :: nUnitCell_1(numNeighborCells),nUnitCell_2(numNeighborCells)
- real(dp)   , intent(in)    :: tn(2,3), vk(2), Coords(ndim,3), Delta
+ real(dp)   , intent(in)    :: LatticeVectors(2,3), vk(2), Coords(ndim,3), Delta
  complex(dp), intent(out) :: zH(ndim,ndim)
  
  integer(dp) :: i, j, n1,n2,icount
@@ -33,12 +34,12 @@ subroutine TightBindingHamiltonian(zH,Delta,Coords,nUnitCell_1,nUnitCell_2,ndim,
         n1=nUnitCell_1(icount)
         n2=nUnitCell_2(icount)
             
-        zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
-        zH(i,j)=zH(i,j)+ft(Coords(i,:), [Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)])*exp(-zi_vk_tn)*zphase
+        zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2)),dp)
+        zH(i,j)=zH(i,j)+ft(Coords(i,:), [Coords(j,1:2)-n1*LatticeVectors(:,1)-n2*LatticeVectors(:,2),Coords(j,3)])*exp(-zi_vk_tn)*zphase
 
                 
-        zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
-        zH(i,j)=zH(i,j)+ft(Coords(i,:), [Coords(j,1:2)+n1*tn(:,1)+n2*tn(:,2),Coords(j,3)])*exp(-zi_vk_tn)*zphase
+        zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2)),dp)
+        zH(i,j)=zH(i,j)+ft(Coords(i,:), [Coords(j,1:2)+n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2),Coords(j,3)])*exp(-zi_vk_tn)*zphase
 
       enddo
 
@@ -57,11 +58,11 @@ end subroutine TightBindingHamiltonian
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,tn,RotMatrix)
+subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,LatticeVectors,RotMatrix)
  
   integer(dp), intent(in)    :: ndim,numNeighborCells
   integer(dp), intent(in)    :: nUnitCell_1(numNeighborCells),nUnitCell_2(numNeighborCells)
-  real(dp)   , intent(in)    :: tn(2,3), vk(2), Coords(ndim,3), RotMatrix(2,2)
+  real(dp)   , intent(in)    :: LatticeVectors(2,3), vk(2), Coords(ndim,3), RotMatrix(2,2)
   complex(dp), intent(out) :: zV(ndim,ndim)
   
   integer(dp) :: i, j, n1,n2,icount,nlayer
@@ -91,9 +92,9 @@ subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,v
           n2=nUnitCell_2(icount)
         
           ri =  Coords(i,:)
-          rj =  [Coords(j,1:2) - n1*tn(:,1) - n2*tn(:,2), Coords(j,3)]
+          rj =  [Coords(j,1:2) - n1*LatticeVectors(:,1) - n2*LatticeVectors(:,2), Coords(j,3)]
           
-          zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+          zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2)),dp)
           
           if (RotateLayers(nlayer).eq.-1)then
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,transpose(RotMatrix))*zphase*exp(-zi_vk_tn)
@@ -101,10 +102,10 @@ subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,v
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,RotMatrix)*zphase*exp(-zi_vk_tn)
           endif
           !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          ri =  [Coords(i,1:2) - n1*tn(:,1) - n2*tn(:,2), Coords(i,3)]
+          ri =  [Coords(i,1:2) - n1*LatticeVectors(:,1) - n2*LatticeVectors(:,2), Coords(i,3)]
           rj =  Coords(j,:) 
           
-          zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+          zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2)),dp)
           
           if (RotateLayers(nlayer).eq.-1)then
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,transpose(RotMatrix))*zphase*exp(-zi_vk_tn)
@@ -135,9 +136,9 @@ subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,v
           n2=nUnitCell_2(icount)
         
           ri =  Coords(i,:)
-          rj =  [Coords(j,1:2) - n1*tn(:,1) - n2*tn(:,2), Coords(j,3)]
+          rj =  [Coords(j,1:2) - n1*LatticeVectors(:,1) - n2*LatticeVectors(:,2), Coords(j,3)]
           
-          zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+          zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2)),dp)
           
           if (RotateLayers(nlayer).eq.-1)then
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,transpose(RotMatrix))*zphase*exp(-zi_vk_tn)
@@ -145,10 +146,10 @@ subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,v
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,RotMatrix)*zphase*exp(-zi_vk_tn)
           endif         
           !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          ri =  [Coords(i,1:2) - n1*tn(:,1) - n2*tn(:,2), Coords(i,3)]
+          ri =  [Coords(i,1:2) - n1*LatticeVectors(:,1) - n2*LatticeVectors(:,2), Coords(i,3)]
           rj =  Coords(j,:) 
           
-          zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+          zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2)),dp)
           
           if (RotateLayers(nlayer).eq.-1)then
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,transpose(RotMatrix))*zphase*exp(-zi_vk_tn)
@@ -168,11 +169,11 @@ subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,v
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 subroutine ValleyTransform(zEigenvectors,Coords,MomentaValues,nMomentaComponents,&
-  numb,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,tn,RotMatrix)
+  numb,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,LatticeVectors,RotMatrix)
 
   integer(dp), intent(in)    :: ndim, numk, Nk, numb, numNeighborCells
   integer(dp), intent(in)    :: nMomentaComponents(Nk,2), nUnitCell_1(numNeighborCells), nUnitCell_2(numNeighborCells)
-  real(dp)   , intent(in)    :: MomentaValues(numk,numk,2), Coords(ndim,3), tn(2,3),RotMatrix(2,2)
+  real(dp)   , intent(in)    :: MomentaValues(numk,numk,2), Coords(ndim,3), LatticeVectors(2,3),RotMatrix(2,2)
   complex(dp), intent(inout) :: zEigenvectors(ndim,numb,Nk)
 
   integer(dp) :: ivk1, ivk2, icount
@@ -182,7 +183,7 @@ subroutine ValleyTransform(zEigenvectors,Coords,MomentaValues,nMomentaComponents
 
   !$omp parallel do &
   !$omp private(icount,vk,ivk1,ivk2,zvalley,zvalleyproj,ztemp) &
-  !$omp shared(Nk,nMomentaComponents,MomentaValues,Coords,ndim,numNeighborCells,nUnitCell_2,nUnitCell_1,tn,RotMatrix,numb,zEigenvectors)
+  !$omp shared(Nk,nMomentaComponents,MomentaValues,Coords,ndim,numNeighborCells,nUnitCell_2,nUnitCell_1,LatticeVectors,RotMatrix,numb,zEigenvectors)
   do icount=1,Nk
       ivk1=nMomentaComponents(icount,1)
       ivk2=nMomentaComponents(icount,2)
@@ -192,7 +193,7 @@ subroutine ValleyTransform(zEigenvectors,Coords,MomentaValues,nMomentaComponents
 
       !write(*,*) 'Create valley matrix at vk'
       zvalley(:,:) = cmplx(0.0_dp,0.0_dp,dp)
-      call ValleyPhase(zvalley,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,tn,RotMatrix)
+      call ValleyPhase(zvalley,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,LatticeVectors,RotMatrix)
 
       zvalleyproj(:,:) = cmplx(0.0_dp,0.0_dp,dp)
       !write(*,*) 'Project valley matrix'
@@ -224,7 +225,7 @@ pure function ft(r_i,r_j)
 
   ft = 0.0_dp
   if(r.GT.0.001_dp)then
-        ft = -2.7_dp*exp((a0-r)/r0)*(1-cs**2) + 0.48_dp*exp((d0-r)/r0)*cs**2
+        ft = V0_pi*exp((a0-r)/r0)*(1-cs**2) + V0_sigma*exp((d0-r)/r0)*cs**2
   endif
 
 end function ft
@@ -240,28 +241,14 @@ pure function ftvalley(ri,rj,RotMatrix)
 
   rij = sqrt((ri(1)-rj(1))**2 + (ri(2)-rj(2))**2)
   if((rij.lt.1.2_dp).and.(rij.gt.0.2_dp))then
-      r = matmul(RotMatrix,[ri(1)- rj(1),ri(2) - rj(2)])
-      x = r(1)
-      y = r(2)
 
-      if(x.GT.0)then
-        phi=atan(y/x)
-      elseif(x.LT.0.AND.y.GT.0)then
-        phi=atan(y/x)+pi
-      else
-        phi=-pi+atan(y/x)   
-      endif
-      if(x.EQ.0)then
-        if(y.GT.0)then
-            phi=pi/2.
-        else
-            phi=-pi/2.
-        endif
-      endif
+    r = matmul(RotMatrix,[ri(1)- rj(1),ri(2) - rj(2)])
+    x = r(1)
+    y = r(2)
 
-  ftvalley = cmplx(0.0_dp,sign(1.0_dp,cos(3.0_dp*phi)),dp)/sqrt(27.0_dp)
+    ftvalley = cmplx(0.0_dp,sign(1.0_dp,cos(3.0_dp*Angle(x,y))),dp)/sqrt(27.0_dp)
   
-     else
+  else
 
   ftvalley = cmplx(0.0_dp,0.0_dp,dp)
 
@@ -881,22 +868,22 @@ end subroutine dosJoint_S
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-  subroutine n1n2toind(index,n1,n2,nUnitCell_1,nUnitCell_2,numNeighborCells)
+  subroutine VectorToFockIndex(FockIndex,n1,n2,nUnitCell_1,nUnitCell_2,numNeighborCells)
 
     integer(dp), intent(in) :: numNeighborCells
     integer(dp), intent(in) :: n1, n2, nUnitCell_1(numNeighborCells), nUnitCell_2(numNeighborCells)
-    integer(dp), intent(inout) :: index
+    integer(dp), intent(inout) :: FockIndex
 
     integer(dp) :: n
     
-    index = -1_dp 
+    FockIndex = -1_dp 
     do n=1,numNeighborCells
         if((abs(real(nUnitCell_1(n))-real(n1)).lt.1e-3).and.(abs(real(nUnitCell_2(n))-real(n2)).lt.1e-3))then
-            index = n
+            FockIndex = n
         endif
     enddo
 
-end subroutine n1n2toind
+end subroutine VectorToFockIndex
 
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

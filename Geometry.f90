@@ -2,7 +2,6 @@ module Geometry
 
 use omp_lib
 use Setup
-use TightBinding
 
 implicit none
 
@@ -1267,6 +1266,29 @@ subroutine Mz_RelatedPoints(nMzpairs,Coords,ndim)
   endif
 
 end subroutine Mz_RelatedPoints 
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+real function Angle(x,y)
+
+    real(dp), intent(in) :: x,y
+    
+    if(x.GT.0)then
+      Angle=atan(y/x)
+    endif
+    if(x.LT.0)then
+      Angle=atan(y/x)+pi    
+    endif
+    if(x.EQ.0)then
+    if(y.GT.0)then
+      Angle=pi/2.
+    else
+      Angle=-pi/2.
+    endif
+    endif
+
+end function fphi
 
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

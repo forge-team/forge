@@ -59,14 +59,16 @@ real(dp), parameter :: alpha = 5.853_dp/epsilon*1.0_dp                  ! e^2/(4
 real(dp), parameter :: alphaH = 5.853_dp/epsilon*1.0_dp                 ! alpha/alphaH is used in the exchange/Hartree term
 
 real(dp), parameter :: pressure=1.0_dp                 ! parameter that mimics hydrostatic pressure. 1.0=no external pressure
+real(dp), parameter :: V0_pi = -2.7_dp                 ! nearest-neighbor intra-layer hopping
+real(dp), parameter :: V0_sigma = 0.48_dp              ! vertical inter-layer hopping
 real(dp), parameter :: a0 = 1.0_dp/sqrt(3.0_dp)        ! carbon-carbon distance in units of a
-real(dp), parameter :: r0 = 0.184_dp                   ! tight-binding decay constant
-real(dp), parameter :: d0 = 1.35772_dp/pressure        ! tight-binding decay constant
+real(dp), parameter :: r0 = 0.184_dp                   ! tight-binding intra-layer decay constant
+real(dp), parameter :: d0 = 1.35772_dp/pressure        ! tight-binding inter-layer decay constant
 real(dp), parameter :: tz = 1.35772_dp/pressure        ! layer separation in units of a
 
 integer(dp), parameter :: nLower=(ndim - 2*numb + 2*ncb)/2+1    ! Lowest band in outputs/FockBulk computation
 integer(dp), parameter :: nUpper=(ndim + 2*ncb)/2               ! Highest band in outputs/FockBulk computation
-integer(dp), parameter :: NeutralityPoint=(ndim/2 - nLower)+1   ! Band index  neutrality point
+integer(dp), parameter :: NeutralityPoint=(ndim/2 - nLower)+1   ! Band FockIndex  neutrality point
 
 real(dp), parameter :: a1(2) = [ 0.5_dp,sqrt(3.0_dp)*0.5_dp]       ! graphene lattice vectors
 real(dp), parameter :: a2(2) = [-0.5_dp,sqrt(3.0_dp)*0.5_dp]       ! graphene lattice vectors
