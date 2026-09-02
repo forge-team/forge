@@ -22,6 +22,7 @@ SRC = \
     TightBinding.f90 \
     Geometry.f90 \
     HartreeFock.f90 \
+    OrderParameter.f90 \
     Main.f90
 
 # Executable
