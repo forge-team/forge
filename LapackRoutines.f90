@@ -81,15 +81,17 @@ subroutine z_vector_overlap(A,B,C,z_factor)
   complex(8), intent(in), optional :: z_factor
 
   integer(8) :: m1
+  complex(8) :: Ctmp(1,1)
   m1 = size(A(:,1))
 
-  C=cmplx(0.0_8,0.0_8,8)
+  Ctmp(1,1) = cmplx(0.0_8,0.0_8,8)
 
   if(present(z_factor)) then
-    call zgemm('C','N',1_8,1_8,m1,z_factor,A,m1,B,m1,cmplx(1.0_8,0.0_8,8),C,1_8) 
+    call zgemm('C','N',1_8,1_8,m1,z_factor,A,m1,B,m1,cmplx(1.0_8,0.0_8,8),Ctmp,1_8)
   else
-    call zgemm('C','N',1_8,1_8,m1,cmplx(1.0_8,0.0_8,8),A,m1,B,m1,cmplx(1.0_8,0.0_8,8),C,1_8)
+    call zgemm('C','N',1_8,1_8,m1,cmplx(1.0_8,0.0_8,8),A,m1,B,m1,cmplx(1.0_8,0.0_8,8),Ctmp,1_8)
   endif
+  C = Ctmp(1,1)
 
 end subroutine z_vector_overlap
 
@@ -102,15 +104,17 @@ subroutine c_vector_overlap(A,B,C,z_factor)
   complex(4), intent(in), optional :: z_factor
 
   integer(4) :: m1
+  complex(4) :: Ctmp(1,1)
   m1 = size(A(:,1))
 
-  C=cmplx(0.0_4,0.0_4,4)
+  Ctmp(1,1) = cmplx(0.0_4,0.0_4,4)
 
   if(present(z_factor)) then
-    call cgemm('C','N',1,1,m1,z_factor,A,m1,B,m1,cmplx(1.0_4,0.0_4,4),C,1)
+    call cgemm('C','N',1,1,m1,z_factor,A,m1,B,m1,cmplx(1.0_4,0.0_4,4),Ctmp,1)
   else
-    call cgemm('C','N',1,1,m1,cmplx(1.0_4,0.0_4,4),A,m1,B,m1,cmplx(1.0_4,0.0_4,4),C,1)
+    call cgemm('C','N',1,1,m1,cmplx(1.0_4,0.0_4,4),A,m1,B,m1,cmplx(1.0_4,0.0_4,4),Ctmp,1)
   endif
+  C = Ctmp(1,1)
 
 end subroutine c_vector_overlap
 
@@ -282,8 +286,8 @@ subroutine c_matrix_elements(A,B,C,i,j,k,l)
    n1 = int(j+1-i,4)
    m2 = int(l+1-k,4)
    allocate(D(m1,n1))
-   call zgemm('N','N',m1,n1,m1,cmplx(1.0_4,0.0_4,4),A,m1,B(:,i:j),m1,cmplx(0.0_4,0.0_4,4),D,m1)
-   call zgemm('T','N',m2,n1,m1,cmplx(1.0_4,0.0_4,4),conjg(B(:,k:l)),m1,D,m1,cmplx(0.0_4,0.0_4,4),C,m2)
+   call cgemm('N','N',m1,n1,m1,cmplx(1.0_4,0.0_4,4),A,m1,B(:,i:j),m1,cmplx(0.0_4,0.0_4,4),D,m1)
+   call cgemm('T','N',m2,n1,m1,cmplx(1.0_4,0.0_4,4),conjg(B(:,k:l)),m1,D,m1,cmplx(0.0_4,0.0_4,4),C,m2)
  else
    m1 = size(A(:,1))
    m2 = size(B(1,:))
