@@ -31,6 +31,53 @@ See [CONTRIBUTORS.md](CONTRIBUTORS.md) for detailed contributions.
 
 Special thanks to **[José González Carmona]**, **[José Carlos Mouriño Gallego]**, and **[John Schliemann]** for their collaboration and support.
 
+
+## Building and Running
+
+### Requirements
+
+- Intel Fortran Compiler (`ifort`)
+- Intel MKL
+- GNU Make
+
+On systems using environment modules, load the required modules:
+
+```bash
+module load intel
+module load imkl
+```
+
+### Compile
+
+Compile the executable:
+
+```bash
+make
+```
+
+### Run
+
+Run the program:
+
+```bash
+make run
+```
+
+This command automatically
+
+- creates the `output/` and `dataFock/` directories if they do not exist;
+- loads the OpenMP environment from `setMemory.sh`;
+- executes the program.
+
+### Clean
+
+Remove the executable and intermediate compilation files:
+
+```bash
+make clean
+```
+
+
 ## License
 
 This project is licensed under the terms of the MIT License.  

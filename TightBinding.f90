@@ -2,7 +2,6 @@ module TightBinding
 
 use Setup
 use lapack_routines
-use Geometry
 
 implicit none
 
@@ -11,16 +10,24 @@ contains
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-subroutine TightBindingHamiltonian(zH,Delta,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,LatticeVectors)
+subroutine TightBindingHamiltonian(zH,Delta,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,tn,nn,nt)
  
  integer(dp), intent(in)    :: ndim,numNeighborCells
- integer(dp), intent(in)    :: nUnitCell_1(numNeighborCells),nUnitCell_2(numNeighborCells)
- real(dp)   , intent(in)    :: LatticeVectors(2,3), vk(2), Coords(ndim,3), Delta
+ integer(dp), intent(in)    :: nUnitCell_1(numNeighborCells),nUnitCell_2(numNeighborCells),nn(ndim,3),nt(ndim,3)
+ real(dp)   , intent(in)    :: tn(2,3), vk(2), Coords(ndim,3), Delta
  complex(dp), intent(out) :: zH(ndim,ndim)
  
  integer(dp) :: i, j, n1,n2,icount
- real(dp)    :: rij, Coords_diff
+ real(dp)    :: rij, Coords_diff, tm(0:6,2)
  complex(dp) :: zi_vk_tn,zphase
+
+  tm(0,:) = [0.0_dp, 0.0_dp]
+  tm(1,:) = tn(:,1)
+  tm(2,:) = tn(:,2)
+  tm(3,:) = tn(:,3)
+  tm(4,:) = -tn(:,1)
+  tm(5,:) = -tn(:,2)
+  tm(6,:) = -tn(:,3)
  
   zH = cmplx(0.0_dp,0.0_dp,dp)
 
@@ -29,17 +36,28 @@ subroutine TightBindingHamiltonian(zH,Delta,Coords,nUnitCell_1,nUnitCell_2,ndim,
    
       zphase=exp(cmplx(0.0_dp,-dot_product(vk,Coords(i,1:2)-Coords(j,1:2))*real(fphase,dp),dp))
      
-      zH(i,j) = zH(i,j) + ft(Coords(i,:),Coords(j,:))*zphase
+      if(TBKaxiras.EQ.1)then
+        zH(i,j) = zH(i,j) + ftKaxiras(Coords(i,:),Coords(j,:),i,j,nn,nt,Coords,tm)*zphase
+      else
+        zH(i,j) = zH(i,j) + ft(Coords(i,:),Coords(j,:))*zphase
+      endif
       do icount=2,numNeighborCells
         n1=nUnitCell_1(icount)
         n2=nUnitCell_2(icount)
             
-        zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2)),dp)
-        zH(i,j)=zH(i,j)+ft(Coords(i,:), [Coords(j,1:2)-n1*LatticeVectors(:,1)-n2*LatticeVectors(:,2),Coords(j,3)])*exp(-zi_vk_tn)*zphase
-
+        zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+        if(TBKaxiras.eq.1)then
+          zH(i,j)=zH(i,j)+ftKaxiras(Coords(i,:),[Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)],i,j,nn,nt,Coords,tm)*exp(-zi_vk_tn)*zphase
+        else
+          zH(i,j)=zH(i,j)+ft(Coords(i,:), [Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)])*exp(-zi_vk_tn)*zphase
+        endif
                 
-        zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2)),dp)
-        zH(i,j)=zH(i,j)+ft(Coords(i,:), [Coords(j,1:2)+n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2),Coords(j,3)])*exp(-zi_vk_tn)*zphase
+        zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+        if(TBKaxiras.eq.1)then
+          zH(i,j)=zH(i,j)+ftKaxiras(Coords(i,:),[Coords(j,1:2)+n1*tn(:,1)+n2*tn(:,2),Coords(j,3)],i,j,nn,nt,Coords,tm)*exp(-zi_vk_tn)*zphase
+        else
+          zH(i,j)=zH(i,j)+ft(Coords(i,:), [Coords(j,1:2)+n1*tn(:,1)+n2*tn(:,2),Coords(j,3)])*exp(-zi_vk_tn)*zphase
+        endif
 
       enddo
 
@@ -58,11 +76,11 @@ end subroutine TightBindingHamiltonian
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,LatticeVectors,RotMatrix)
+subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,tn,RotMatrix)
  
   integer(dp), intent(in)    :: ndim,numNeighborCells
   integer(dp), intent(in)    :: nUnitCell_1(numNeighborCells),nUnitCell_2(numNeighborCells)
-  real(dp)   , intent(in)    :: LatticeVectors(2,3), vk(2), Coords(ndim,3), RotMatrix(2,2)
+  real(dp)   , intent(in)    :: tn(2,3), vk(2), Coords(ndim,3), RotMatrix(2,2)
   complex(dp), intent(out) :: zV(ndim,ndim)
   
   integer(dp) :: i, j, n1,n2,icount,nlayer
@@ -92,9 +110,9 @@ subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,v
           n2=nUnitCell_2(icount)
         
           ri =  Coords(i,:)
-          rj =  [Coords(j,1:2) - n1*LatticeVectors(:,1) - n2*LatticeVectors(:,2), Coords(j,3)]
+          rj =  [Coords(j,1:2) - n1*tn(:,1) - n2*tn(:,2), Coords(j,3)]
           
-          zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2)),dp)
+          zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
           
           if (RotateLayers(nlayer).eq.-1)then
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,transpose(RotMatrix))*zphase*exp(-zi_vk_tn)
@@ -102,10 +120,10 @@ subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,v
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,RotMatrix)*zphase*exp(-zi_vk_tn)
           endif
           !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          ri =  [Coords(i,1:2) - n1*LatticeVectors(:,1) - n2*LatticeVectors(:,2), Coords(i,3)]
+          ri =  [Coords(i,1:2) - n1*tn(:,1) - n2*tn(:,2), Coords(i,3)]
           rj =  Coords(j,:) 
           
-          zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2)),dp)
+          zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
           
           if (RotateLayers(nlayer).eq.-1)then
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,transpose(RotMatrix))*zphase*exp(-zi_vk_tn)
@@ -136,9 +154,9 @@ subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,v
           n2=nUnitCell_2(icount)
         
           ri =  Coords(i,:)
-          rj =  [Coords(j,1:2) - n1*LatticeVectors(:,1) - n2*LatticeVectors(:,2), Coords(j,3)]
+          rj =  [Coords(j,1:2) - n1*tn(:,1) - n2*tn(:,2), Coords(j,3)]
           
-          zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2)),dp)
+          zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
           
           if (RotateLayers(nlayer).eq.-1)then
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,transpose(RotMatrix))*zphase*exp(-zi_vk_tn)
@@ -146,10 +164,10 @@ subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,v
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,RotMatrix)*zphase*exp(-zi_vk_tn)
           endif         
           !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          ri =  [Coords(i,1:2) - n1*LatticeVectors(:,1) - n2*LatticeVectors(:,2), Coords(i,3)]
+          ri =  [Coords(i,1:2) - n1*tn(:,1) - n2*tn(:,2), Coords(i,3)]
           rj =  Coords(j,:) 
           
-          zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2)),dp)
+          zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
           
           if (RotateLayers(nlayer).eq.-1)then
             zV(i,j) = zV(i,j) + ftvalley(ri,rj,transpose(RotMatrix))*zphase*exp(-zi_vk_tn)
@@ -169,11 +187,11 @@ subroutine ValleyPhase(zV,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,v
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 subroutine ValleyTransform(zEigenvectors,Coords,MomentaValues,nMomentaComponents,&
-  numb,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,LatticeVectors,RotMatrix)
+  numb,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,tn,RotMatrix)
 
   integer(dp), intent(in)    :: ndim, numk, Nk, numb, numNeighborCells
   integer(dp), intent(in)    :: nMomentaComponents(Nk,2), nUnitCell_1(numNeighborCells), nUnitCell_2(numNeighborCells)
-  real(dp)   , intent(in)    :: MomentaValues(numk,numk,2), Coords(ndim,3), LatticeVectors(2,3),RotMatrix(2,2)
+  real(dp)   , intent(in)    :: MomentaValues(numk,numk,2), Coords(ndim,3), tn(2,3),RotMatrix(2,2)
   complex(dp), intent(inout) :: zEigenvectors(ndim,numb,Nk)
 
   integer(dp) :: ivk1, ivk2, icount
@@ -183,7 +201,7 @@ subroutine ValleyTransform(zEigenvectors,Coords,MomentaValues,nMomentaComponents
 
   !$omp parallel do &
   !$omp private(icount,vk,ivk1,ivk2,zvalley,zvalleyproj,ztemp) &
-  !$omp shared(Nk,nMomentaComponents,MomentaValues,Coords,ndim,numNeighborCells,nUnitCell_2,nUnitCell_1,LatticeVectors,RotMatrix,numb,zEigenvectors)
+  !$omp shared(Nk,nMomentaComponents,MomentaValues,Coords,ndim,numNeighborCells,nUnitCell_2,nUnitCell_1,tn,RotMatrix,numb,zEigenvectors)
   do icount=1,Nk
       ivk1=nMomentaComponents(icount,1)
       ivk2=nMomentaComponents(icount,2)
@@ -193,7 +211,7 @@ subroutine ValleyTransform(zEigenvectors,Coords,MomentaValues,nMomentaComponents
 
       !write(*,*) 'Create valley matrix at vk'
       zvalley(:,:) = cmplx(0.0_dp,0.0_dp,dp)
-      call ValleyPhase(zvalley,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,LatticeVectors,RotMatrix)
+      call ValleyPhase(zvalley,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,tn,RotMatrix)
 
       zvalleyproj(:,:) = cmplx(0.0_dp,0.0_dp,dp)
       !write(*,*) 'Project valley matrix'
@@ -225,13 +243,97 @@ pure function ft(r_i,r_j)
 
   ft = 0.0_dp
   if(r.GT.0.001_dp)then
-        ft = V0_pi*exp((a0-r)/r0)*(1-cs**2) + V0_sigma*exp((d0-r)/r0)*cs**2
+        ft = -2.7_dp*exp((a0-r)/r0)*(1-cs**2) + 0.48_dp*exp((d0-r)/r0)*cs**2
   endif
 
 end function ft
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+function ftKaxiras(r_i,r_j,i,j,nn,nt,Coords,tn)
+
+  integer(dp), intent(in) :: i,j, nn(ndim,3), nt(ndim,3)
+  real(dp), intent(in) :: r_i(3),r_j(3),tn(0:6,2), Coords(ndim,3)
+  
+  integer(dp) :: nni(3), nti(3), nnj(3), ntj(3)
+  real(dp) :: theta12_1, theta12_2, theta12_3
+  real(dp) :: theta21_1, theta21_2, theta21_3
+  real(dp) :: V0,V3,V6,r
+  
+  real(dp) :: ftKaxiras
+
+  
+  if(abs(r_i(3) - r_j(3)).gt.(tz*0.1))then
+
+    nni = nn(i,:)
+    nnj = nn(j,:)
+    nti = nt(i,:)
+    ntj = nt(j,:)
+
+    
+!    theta21_1 = atan2(r_j(2)-r_i(2),r_j(1)-r_i(1))&
+!                - atan2(Coords(nnj(1),2) - tn(ntj(1),2)-Coords(j,2), Coords(nnj(1),1) - tn(ntj(1),1) -Coords(j,1))+ pi
+!
+!    theta21_2 = atan2(r_j(2)-r_i(2),r_j(1)-r_i(1))&
+!                - atan2(Coords(nnj(2),2) - tn(ntj(2),2)-Coords(j,2), Coords(nnj(2),1) - tn(ntj(2),1) -Coords(j,1))+ pi
+!
+!    theta21_3 = atan2(r_j(2)-r_i(2),r_j(1)-r_i(1))&
+!                - atan2(Coords(nnj(3),2) - tn(ntj(3),2)-Coords(j,2), Coords(nnj(3),1) - tn(ntj(3),1) -Coords(j,1))+ pi
+!
+!
+!    theta12_1 = atan2(r_j(2)-r_i(2),r_j(1)-r_i(1))&
+!                - atan2(Coords(nni(1),2) - tn(nti(1),2)-Coords(i,2), Coords(nni(1),1) - tn(nti(1),1) -Coords(i,1)) 
+!
+!    theta12_2 = atan2(r_j(2)-r_i(2),r_j(1)-r_i(1))&
+!                - atan2(Coords(nni(2),2) - tn(nti(2),2)-Coords(i,2), Coords(nni(2),1) - tn(nti(2),1) -Coords(i,1)) 
+!
+!    theta12_3 = atan2(r_j(2)-r_i(2),r_i(1)-r_i(1))&
+!                - atan2(Coords(nni(3),2) - tn(nti(3),2)-Coords(i,2), Coords(nni(3),1) - tn(nti(3),1) -Coords(i,1))
+
+    theta21_1 = atan2(r_i(2)-r_j(2),r_i(1)-r_j(1))&
+                - atan2(Coords(nnj(1),2) - tn(ntj(1),2)-Coords(j,2), Coords(nnj(1),1) - tn(ntj(1),1) -Coords(j,1))
+
+    theta21_2 = atan2(r_i(2)-r_j(2),r_i(1)-r_j(1))&
+                - atan2(Coords(nnj(2),2) - tn(ntj(2),2)-Coords(j,2), Coords(nnj(2),1) - tn(ntj(2),1) -Coords(j,1))
+
+    theta21_3 = atan2(r_i(2)-r_j(2),r_i(1)-r_j(1))&
+                - atan2(Coords(nnj(3),2) - tn(ntj(3),2)-Coords(j,2), Coords(nnj(3),1) - tn(ntj(3),1) -Coords(j,1))
+
+
+    theta12_1 = atan2(r_i(2)-r_j(2),r_i(1)-r_j(1))&
+                - atan2(Coords(nni(1),2) - tn(nti(1),2)-Coords(i,2), Coords(nni(1),1) - tn(nti(1),1) -Coords(i,1)) + pi
+
+    theta12_2 = atan2(r_i(2)-r_j(2),r_i(1)-r_j(1))&
+                - atan2(Coords(nni(2),2) - tn(nti(2),2)-Coords(i,2), Coords(nni(2),1) - tn(nti(2),1) -Coords(i,1)) + pi
+
+    theta12_3 = atan2(r_i(2)-r_j(2),r_i(1)-r_j(1))&
+                - atan2(Coords(nni(3),2) - tn(nti(3),2)-Coords(i,2), Coords(nni(3),1) - tn(nti(3),1) -Coords(i,1)) + pi
+ 
+    r=sqrt((r_i(1)-r_j(1))**2 + (r_i(2)-r_j(2))**2)
+    V0 = lambda0*exp(-xi0*(r**2))*cos(kappa0*r)
+    V3 = lambda3*(r**2.0_dp)*exp(-xi3*(r-y3)**2)
+    V6 = lambda6*exp(-xi6*(r-y6)**2)*sin(kappa6*r)
+    
+    ftKaxiras = V0 + V3*((cos(3.0_dp*theta12_1) + cos(3.0_dp*theta12_2) + cos(3.0_dp*theta12_3))/3.0_dp&
+                         + (cos(3.0_dp*theta21_1) + cos(3.0_dp*theta21_2) + cos(3.0_dp*theta21_3))/3.0_dp)&
+                    + V6*((cos(6.0_dp*theta12_1) + cos(6.0_dp*theta12_2) + cos(6.0_dp*theta12_3))/3.0_dp&
+                         + (cos(6.0_dp*theta21_1) + cos(6.0_dp*theta21_2) + cos(6.0_dp*theta21_3))/3.0_dp) 
+        
+ else
+    
+    r=sqrt((r_i(1)-r_j(1))**2 + (r_i(2)-r_j(2))**2)
+
+    if(r.GT.a0*0.1_dp)then    
+        ftKaxiras = tparallel0*exp(-al0*(r**2))*cos(bet0*r) + tparallel1*(r**2)*exp(-al1*(r-y1)**2)
+    else
+        ftKaxiras=0.0_dp
+    endif
+
+  endif
+  
+end function ftKaxiras
 
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-!%
 
 pure function ftvalley(ri,rj,RotMatrix)
 
@@ -241,14 +343,28 @@ pure function ftvalley(ri,rj,RotMatrix)
 
   rij = sqrt((ri(1)-rj(1))**2 + (ri(2)-rj(2))**2)
   if((rij.lt.1.2_dp).and.(rij.gt.0.2_dp))then
+      r = matmul(RotMatrix,[ri(1)- rj(1),ri(2) - rj(2)])
+      x = r(1)
+      y = r(2)
 
-    r = matmul(RotMatrix,[ri(1)- rj(1),ri(2) - rj(2)])
-    x = r(1)
-    y = r(2)
+      if(x.GT.0)then
+        phi=atan(y/x)
+      elseif(x.LT.0.AND.y.GT.0)then
+        phi=atan(y/x)+pi
+      else
+        phi=-pi+atan(y/x)   
+      endif
+      if(x.EQ.0)then
+        if(y.GT.0)then
+            phi=pi/2.
+        else
+            phi=-pi/2.
+        endif
+      endif
 
-    ftvalley = cmplx(0.0_dp,sign(1.0_dp,cos(3.0_dp*Angle(x,y))),dp)/sqrt(27.0_dp)
+  ftvalley = cmplx(0.0_dp,sign(1.0_dp,cos(3.0_dp*phi)),dp)/sqrt(27.0_dp)
   
-  else
+     else
 
   ftvalley = cmplx(0.0_dp,0.0_dp,dp)
 
@@ -868,22 +984,22 @@ end subroutine dosJoint_S
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-  subroutine VectorToFockIndex(FockIndex,n1,n2,nUnitCell_1,nUnitCell_2,numNeighborCells)
+  subroutine n1n2toind(index,n1,n2,nUnitCell_1,nUnitCell_2,numNeighborCells)
 
     integer(dp), intent(in) :: numNeighborCells
     integer(dp), intent(in) :: n1, n2, nUnitCell_1(numNeighborCells), nUnitCell_2(numNeighborCells)
-    integer(dp), intent(inout) :: FockIndex
+    integer(dp), intent(inout) :: index
 
     integer(dp) :: n
     
-    FockIndex = -1_dp 
+    index = -1_dp 
     do n=1,numNeighborCells
         if((abs(real(nUnitCell_1(n))-real(n1)).lt.1e-3).and.(abs(real(nUnitCell_2(n))-real(n2)).lt.1e-3))then
-            FockIndex = n
+            index = n
         endif
     enddo
 
-end subroutine VectorToFockIndex
+end subroutine n1n2toind
 
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

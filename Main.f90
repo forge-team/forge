@@ -52,16 +52,16 @@ character(150) :: my_iomsg
 character(1) :: dop
 
 integer(dp) :: Nk = numk*numk
-integer(dp) :: icount, n, m, i, j, nspin, it, numNeighborCells
+integer(dp) :: icount, n, m, i, j, nspin, it, numNeighborCells, nn(ndim,3), nt(ndim,3)
 integer(dp) :: my_iostat, rcc
 integer(dp) :: nEnergyFile,nConvergenceFile
 integer(dp) :: nFermiLevel, nOccStates(numS), nPartOccStates(numS), nWindowSort_2Spins(2,2)
 
 real(dp) :: aMoire, cs, sn
-real(dp) :: t1(2), t2(2), t3(2), g1(2), g12(2), RotMatrix(2,2)
-real(dp) :: DensityConvergence(2), DegFactor, FermiEnergy, Step
-real(dp) :: KineticEnergy(numS),FockEnergy(numS),HartreeEnergy,HubbardEnergy,TotalEnergy
-real(dp) :: KineticEnergyIn(numS),FockEnergyIn(numS),HartreeEnergyIn,HubbardEnergyIn,TotalEnergyIn
+real(dp) :: t1(2), t2(2), t3(2), tn(6,2), g1(2), g12(2), RotMatrix(2,2)
+real(dp) :: DensityConvergence(2), DegFactor, FermiEnergy, Step, EnergyTolerance
+real(dp) :: KineticEnergy(numS)=0.0_dp,FockEnergy(numS)=0.0_dp,HartreeEnergy=0.0_dp,HubbardEnergy=0.0_dp,TotalEnergy=0.0_dp
+real(dp) :: KineticEnergyIn(numS)=0.0_dp,FockEnergyIn(numS)=0.0_dp,HartreeEnergyIn=0.0_dp,HubbardEnergyIn=0.0_dp,TotalEnergyIn=0.0_dp
 
 complex(dpIn) :: zinput
 
@@ -155,12 +155,25 @@ t3 = t2-t1
 
 if(nrelax.EQ.1)then
     if (nlayers.EQ.2)then   !Lattice relaxation available only for nlayers=2 in current version
-        call LatticeRelaxation(Coords,g1,g12)
+        call LatticeRelaxationKoshino(Coords,g1,g12)
+    endif
+endif
+if(nrelax.EQ.2)then
+    if (nlayers.EQ.2)then   !Lattice relaxation available only for nlayers=2 in current version
+        call LatticeRelaxationCarr(Coords,g1,g12)
     endif
 endif
 
 call C2_RelatedPoints(nC2pairs,Coords,ndim)
 call C3_RelatedPoints(nC3pairs,Coords,ndim)
+
+tn(1,:) = t1(:)
+tn(2,:) = t2(:)
+tn(3,:) = t3(:)
+tn(4,:) = -t1(:)
+tn(5,:) = -t2(:)
+tn(6,:) = -t3(:)
+call getNearestNeighbors(nn,nt,Coords,ndim,tn)
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!! Define interaction and the neighbourhood 
@@ -233,20 +246,75 @@ if(nRead.EQ.1)then
         close(12)        
     enddo
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    do nspin=1,numS
+!        
+!        zSortedEigenvectors(1:ndim/4,1,nspin) = (1.0_dp/(2.0_dp))*exp(cmplx(0.0_dp,-pi/4.0_dp,dp))
+!        zSortedEigenvectors(ndim/4+1:ndim/2,1,nspin) = cmplx(0.0_dp,1.0_dp,dp)*(1.0_dp/(2.0_dp))*exp(cmplx(0.0_dp,-pi/4.0_dp,dp))
+!        zSortedEigenvectors(ndim/2+1:3*ndim/4,1,nspin) = (1.0_dp/(2.0_dp))*exp(cmplx(0.0_dp,pi/4.0_dp,dp))
+!        zSortedEigenvectors(3*ndim/4+1:ndim,1,nspin) = cmplx(0.0_dp,1.0_dp,dp)*(1.0_dp/(2.0_dp))*exp(cmplx(0.0_dp,pi/4.0_dp,dp))
+!              
+!        do i=1,ndim/4
+!                zSortedEigenvectors(i,1,nspin) = zSortedEigenvectors(i,1,nspin)*exp(cmplx(0.0_dp,dot_product(ntheta*(g12-g1) + 1.0_dp/3.0_dp*(2*g12-g1),Coords(i,1:2))))
+!        enddo
+!        do i=ndim/4+1,ndim/2
+!                zSortedEigenvectors(i,1,nspin) = zSortedEigenvectors(i,1,nspin)*exp(cmplx(0.0_dp,-dot_product(ntheta*(g12-g1) + 1.0_dp/3.0_dp*(2*g12-g1),Coords(i,1:2))))
+!        enddo       
+!        do i=ndim/2+1,3*ndim/4
+!                zSortedEigenvectors(i,1,nspin) = zSortedEigenvectors(i,1,nspin)*exp(cmplx(0.0_dp,dot_product(ntheta*(g12-g1) + 1.0_dp/3.0_dp*(2*g12-g1),Coords(i,1:2))))
+!        enddo 
+!        do i=3*ndim/4+1,ndim
+!                zSortedEigenvectors(i,1,nspin) = zSortedEigenvectors(i,1,nspin)*exp(cmplx(0.0_dp,-dot_product(ntheta*(g12-g1) + 1.0_dp/3.0_dp*(-2*g1+g12),Coords(i,1:2))))
+!        enddo
+!
+!        zSortedEigenvectors(:,1,nspin) = zSortedEigenvectors(:,1,nspin)*exp(-(Coords(:,1)**2 + Coords(:,2)**2)/(2.0_dp*(0.15*norm2(t1))**2))
+!        zSortedEigenvectors(:,1,nspin) = zSortedEigenvectors(:,1,nspin)/sqrt(sum(abs(zSortedEigenvectors(:,1,nspin))**2))*sqrt(real(numk*numk,dp))
+!        
+!        nSortedMomenta(1,1,nspin) = 0_dp
+!        nSortedMomenta(1,2,nspin) = 0_dp
+!      
+!        call GetFock(zFock(:,:,:,nspin),zSortedEigenvectors(:,:,nspin),ndim,numb,numk,&
+!        1.0_dp,1_dp,0_dp,Coords,MomentaValues,numNeighborCells,nUnitCell_1,nUnitCell_2,nSortedMomenta(:,:,nspin))
+!        zFock(:,:,:,nspin) = zFock(:,:,:,nspin)/real(numk*numk,dp)
+!
+!        do m=2,numNeighborCells
+!                zFock(:,:,m,nspin) = cmplx(0.0_dp,0.0_dp,dp)
+!        enddo
+!
+!        !t
+!        !zFock(:,:,:,nspin) = cmplx(real(2.0*zFock(:,:,:,nspin),dp),0.0_dp,dp)
+!        !c2t
+!        do m=1,numNeighborCells
+!                zFock(:,:,m,nspin) = 1.0_dp*(zFock(:,:,m,nspin) + (transpose(zFock(nC2pairs(:),nC2pairs(:),m,nspin))))
+!        enddo
+!        
+!        do i=1,ndim
+!                zFock(i,i,1,nspin) = cmplx(0.5_dp,0.0_dp,dp)
+!        enddo
+!       
+!    enddo
+
 else
 
     write(*,*) 'first diagonalization...'
 
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    open(10,file='EnergyTolerance.dat', status='old',action='read')
+    read(10,*) EnergyTolerance
+    close(10)
+    write(*,*) 'EnergyTolerance', EnergyTolerance
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!! Enforce three-fold symmetry
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     if(nenforceC3.eq.1)then
         call Solve_C3(zFockBulk(:,:,:,1),zFock(:,:,:,1),Potential(:,1),alpha,Bands(:,:,1), &
-            zEigenvectors(:,:,:,1),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,RotateLayers,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),g1,g12,nC3pairs)
+            zEigenvectors(:,:,:,1),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,RotateLayers,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),g1,g12,nC3pairs,nn,nt)
     else
         call Solve(zFockBulk(:,:,:,1),zFock(:,:,:,1),Potential(:,1),alpha,Bands(:,:,1), &
-            zEigenvectors(:,:,:,1),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]))
+            zEigenvectors(:,:,:,1),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),nn,nt)
     endif
 
     write(*,*) 'sorting...'
@@ -284,6 +352,21 @@ else
     if(numS.eq.2)then
         zFock(:,:,:,2) =  zFock(:,:,:,1)
     endif
+    
+    write(*,*) 'Output'
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !!!!!!!!! Output bands !!! !!!!
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    do nspin=1,numS
+        if(nPrintOutputs.EQ.1)then
+
+            write(filename,'(A7,A5,A6,I0,A210)') dir,'Bands','-nspin',nspin,parameters
+            open(99,file=filename,status='replace')
+            call PlotBands(Bands(:,:,nspin),FermiEnergy,nMomentaFlattened,numb,numk,Nk,g1,g12)
+            close(99)
+
+        endif
+    enddo
 
 endif
 
@@ -298,18 +381,18 @@ enddo
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 write(*,*) 'get energies, ...'
 
-do nspin=1,numS
-        call GetKineticEnergy(KineticEnergy(nspin),Coords,zFock(:,:,:,nspin),Delta,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,reshape([t1,t2,t3],[2,3]))
-        call GetFockEnergy(FockEnergy(nspin),Coords,zFock(:,:,:,nspin),nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,reshape([t1,t2,t3],[2,3]))
-enddo
-
-if(numS.EQ.1)then
-    call GetHartreeHubbardEnergy(HartreeEnergy,HubbardEnergy,LongRange,Density(:,1)-DensitySub(:),Density(:,1)-DensitySub(:),ndim)
-else
-    call GetHartreeHubbardEnergy(HartreeEnergy,HubbardEnergy,LongRange,Density(:,1)-DensitySub(:),Density(:,2)-DensitySub(:),ndim)
-endif
-
-TotalEnergy = alpha*sum(FockEnergy)*real(3-numS,dp) + sum(KineticEnergy)*real(3-numS,dp) + U*HubbardEnergy + alphaH*HartreeEnergy
+!do nspin=1,numS
+!        call GetKineticEnergy(KineticEnergy(nspin),Coords,zFock(:,:,:,nspin),Delta,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,reshape([t1,t2,t3],[2,3]),nn,nt)
+!        call GetFockEnergy(FockEnergy(nspin),Coords,zFock(:,:,:,nspin),nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,reshape([t1,t2,t3],[2,3]))
+!enddo
+!
+!if(numS.EQ.1)then
+!    call GetHartreeHubbardEnergy(HartreeEnergy,HubbardEnergy,LongRange,Density(:,1)-DensitySub(:),Density(:,1)-DensitySub(:),ndim)
+!else
+!    call GetHartreeHubbardEnergy(HartreeEnergy,HubbardEnergy,LongRange,Density(:,1)-DensitySub(:),Density(:,2)-DensitySub(:),ndim)
+!endif
+!
+!TotalEnergy = alpha*sum(FockEnergy)*real(3-numS,dp) + sum(KineticEnergy)*real(3-numS,dp) + U*HubbardEnergy + alphaH*HartreeEnergy
 
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -366,6 +449,13 @@ do while(it.LT.itmax)
     it=it+1
     write(*,*) 'it=',it
 
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    open(10,file='EnergyTolerance.dat', status='old',action='read')
+    read(10,*) EnergyTolerance
+    close(10)
+    write(*,*) 'EnergyTolerance', EnergyTolerance
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !!!!!!!!!!! Get new fock0
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -374,10 +464,10 @@ do while(it.LT.itmax)
     
         if(nenforceC3.eq.1)then
             call Solve_C3(zFockBulk(:,:,:,nspin),zFock(:,:,:,nspin),Potential(:,nspin),alpha,Bands(:,:,nspin), &
-                zEigenvectors(:,:,:,nspin),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,RotateLayers,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),g1,g12,nC3pairs)
+                zEigenvectors(:,:,:,nspin),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,RotateLayers,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),g1,g12,nC3pairs,nn,nt)
         else
             call Solve(zFockBulk(:,:,:,nspin),zFock(:,:,:,nspin),Potential(:,nspin),alpha,Bands(:,:,nspin), &
-                zEigenvectors(:,:,:,nspin),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]))
+                zEigenvectors(:,:,:,nspin),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),nn,nt)
         endif
 
 
@@ -550,11 +640,18 @@ do while(it.LT.itmax)
         Density(n,:) = real(zFock(n,n,1,:),dp)
     enddo
 
-    call OptimalStep(Step,HartreeEnergy,FockEnergy,HubbardEnergy,KineticEnergy,zFock,zFockIn,&
-        Density,DensityIn,DensitySub,ndim,numNeighborCells,Coords,LongRange,Delta,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]))
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !call OptimalStep(Step,HartreeEnergy,FockEnergy,HubbardEnergy,KineticEnergy,zFock,zFockIn,&
+    !    Density,DensityIn,DensitySub,ndim,numNeighborCells,Coords,LongRange,Delta,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),nn,nt)
 
-    TotalEnergy = alpha*sum(FockEnergy)*real(3-numS,dp) + sum(KineticEnergy)*real(3-numS,dp) + U*HubbardEnergy + alphaH*HartreeEnergy
+    !TotalEnergy = alpha*sum(FockEnergy)*real(3-numS,dp) + sum(KineticEnergy)*real(3-numS,dp) + U*HubbardEnergy + alphaH*HartreeEnergy
 
+    if(mod(it,2).eq.1)then
+        Step = 1.0_dp
+    else
+        Step = 0.5_dp
+    endif
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
     zFock = Step*zFock + (1.0_dp-Step)*zFockIn
 
     do n=1,ndim
