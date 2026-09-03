@@ -99,8 +99,11 @@ subroutine getNearestNeighbors(NearestNeighborsUC,NearestNeighborsT,Coords,ndim,
     integer(dp), intent(in)    :: ndim
     integer(dp), intent(inout) :: NearestNeighborsUC(ndim,3),NearestNeighborsT(ndim,3)
     real(dp), intent(in)    :: tn(6,2), Coords(ndim,3)
-    
-    
+
+    ! NearestNeighborsUC(i,j) = atom index inside the unit cell of the j^th nearest neighbor of the i^th atom
+    ! NearestNeighborsT(i,j) = lattice vector displacement of the j^th nearest neighbor of the i^th atom (the
+    !                           nearest neighbor lives outside the first unit cell fro atoms near the boundaries)
+        
     integer(dp) :: i,j,n,ncount,ntemp,ntemp1,ntemp2,ntempt,ntempt1,ntempt2
     real(dp) :: rij,x,y,phi,temp,temp1,temp2,tempt,tempt1,tempt2,rot(ndim,3) 
     

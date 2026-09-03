@@ -1,9 +1,11 @@
 !
 ! Equivalent compute order parameters driver for the current FORGE workspace.
 ! This program reads an existing Fock matrix, constructs the real-space
-! geometry, and computes order-parameter quantities using the external
-! OrderPlot module routines.
-!
+! geometry, diagonalizes and computes the computes order-parameter quantities using the external
+! OrderPlot module routines, restricted to a set of low-energy bands.
+! Now, it obtains the order parameters of the occupied central 4 bands (i.e. tailored to the flat bands of TBG)
+! as well as of the central numb bands (usually numb=20 for TBG).
+
 program computeorderparams
 
 use omp_lib

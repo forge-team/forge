@@ -54,19 +54,27 @@ end subroutine LongRangeInteraction
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-subroutine HamiltonianHartreeFock(zH,Coords,Potential,alpha,Delta,zFock,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,LatticeVectors)
+subroutine HamiltonianHartreeFock(zH,Coords,Potential,alpha,Delta,zFock,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,tn,NearestNeighborsUC,NearestNeighborsT)
 
   integer(dp), intent(in)    :: ndim, numNeighborCells
 
-  integer(dp), intent(in)    :: nUnitCell_1(numNeighborCells), nUnitCell_2(numNeighborCells)
-  real(dp)   , intent(in)    :: LatticeVectors(2,3), vk(2), Coords(ndim,3)
+  integer(dp), intent(in)    :: nUnitCell_1(numNeighborCells), nUnitCell_2(numNeighborCells),NearestNeighborsUC(ndim,3),NearestNeighborsT(ndim,3)
+  real(dp)   , intent(in)    :: tn(2,3), vk(2), Coords(ndim,3)
   real(dp)   , intent(in)    :: alpha, Delta, Potential(ndim)
   complex(dp) , intent(in)   :: zFock(ndim,ndim,numNeighborCells)
   complex(dp), intent(out) :: zH(ndim,ndim)
 
   integer(dp) :: i, j, icount, n1, n2
-  real(dp)    :: rij, Coords_diff
+  real(dp)    :: rij, Coords_diff, tm(0:6,2)
   complex(dp) :: zi_vk_tn,zsum,zphase
+
+  tm(0,:) = [0.0_dp, 0.0_dp]
+  tm(1,:) = tn(:,1)
+  tm(2,:) = tn(:,2)
+  tm(3,:) = tn(:,3)
+  tm(4,:) = -tn(:,1)
+  tm(5,:) = -tn(:,2)
+  tm(6,:) = -tn(:,3)
 
   zH(:,:) = cmplx(0.0_dp,0.0_dp,dp)
 
@@ -80,19 +88,29 @@ subroutine HamiltonianHartreeFock(zH,Coords,Potential,alpha,Delta,zFock,nUnitCel
 
       zH(i,j)=zH(i,j)-alpha*fv(Coords(i,:),Coords(j,:))*conjg(zFock(i,j,1))*zphase
      
-      zH(i,j) = zH(i,j)+ft(Coords(i,:), Coords(j,:))*zphase
-
+      if(TBKaxiras.eq.1)then
+        zH(i,j) = zH(i,j)+ftKaxiras(Coords(i,:),Coords(j,:),i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*zphase
+      else
+        zH(i,j) = zH(i,j)+ft(Coords(i,:), Coords(j,:))*zphase
+      endif
 
       do icount=2,numNeighborCells
         n1=nUnitCell_1(icount)
         n2=nUnitCell_2(icount)
               
-        zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2)),dp)
-        zH(i,j)=zH(i,j)+ft(Coords(i,:), [Coords(j,1:2)-n1*LatticeVectors(:,1)-n2*LatticeVectors(:,2),Coords(j,3)])*exp(-zi_vk_tn)*zphase
-
+        zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+        if(TBKaxiras.eq.1)then
+          zH(i,j)=zH(i,j)+ftKaxiras(Coords(i,:), [Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)],i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*exp(-zi_vk_tn)*zphase
+        else
+          zH(i,j)=zH(i,j)+ft(Coords(i,:), [Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)])*exp(-zi_vk_tn)*zphase
+        endif
         
-        zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2)),dp)
-        zH(i,j)=zH(i,j)+ft(Coords(i,:), [Coords(j,1:2)+n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2),Coords(j,3)])*exp(-zi_vk_tn)*zphase
+        zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+        if(TBKaxiras.eq.1)then
+          zH(i,j)=zH(i,j)+ftKaxiras(Coords(i,:), [Coords(j,1:2)+n1*tn(:,1)+n2*tn(:,2),Coords(j,3)],i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*exp(-zi_vk_tn)*zphase
+        else
+          zH(i,j)=zH(i,j)+ft(Coords(i,:), [Coords(j,1:2)+n1*tn(:,1)+n2*tn(:,2),Coords(j,3)])*exp(-zi_vk_tn)*zphase
+        endif
 
   
       enddo
@@ -103,11 +121,11 @@ subroutine HamiltonianHartreeFock(zH,Coords,Potential,alpha,Delta,zFock,nUnitCel
         n1=nUnitCell_1(icount)
         n2=nUnitCell_2(icount)
         
-        zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2)),dp)
+        zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
 
-        zsum=zsum-alpha*fv(Coords(i,:),[Coords(j,1:2)-n1*LatticeVectors(:,1)-n2*LatticeVectors(:,2),Coords(j,3)])*conjg(zFock(i,j,icount))*exp(-zi_vk_tn)
+        zsum=zsum-alpha*fv(Coords(i,:),[Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)])*conjg(zFock(i,j,icount))*exp(-zi_vk_tn)
         
-        zsum=zsum-alpha*fv(Coords(j,:),[Coords(i,1:2)-n1*LatticeVectors(:,1)-n2*LatticeVectors(:,2),Coords(i,3)])*zFock(j,i,icount)*exp( zi_vk_tn)
+        zsum=zsum-alpha*fv(Coords(j,:),[Coords(i,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(i,3)])*zFock(j,i,icount)*exp( zi_vk_tn)
       
       enddo
 
@@ -129,12 +147,12 @@ end subroutine HamiltonianHartreeFock
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 subroutine Solve_C3(zFockBulk,zFock,Potential,alpha,Bands,zEigenvectors,&
-  Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,RotateLayers,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,LatticeVectors,g1,g12,nC3pairs)
+  Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,RotateLayers,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,tn,g1,g12,nC3pairs,NearestNeighborsUC,NearestNeighborsT)
 
   integer(dp), intent(in)    :: ndim, numk, Nk, nLower, nUpper,numNeighborCells, nC3pairs(ndim), RotateLayers(nlayers)
-  integer(dp), intent(in)    :: nMomentaComponents(Nk,2)
+  integer(dp), intent(in)    :: nMomentaComponents(Nk,2),NearestNeighborsUC(ndim,3),NearestNeighborsT(ndim,3)
   integer(dp), intent(in)    :: nUnitCell_1(numNeighborCells),nUnitCell_2(numNeighborCells)
-  real(dp)   , intent(in)    :: LatticeVectors(2,3), MomentaValues(numk,numk,2), Coords(ndim,3),Potential(ndim), g1(2), g12(2)
+  real(dp)   , intent(in)    :: tn(2,3), MomentaValues(numk,numk,2), Coords(ndim,3),Potential(ndim), g1(2), g12(2)
   real(dp)   , intent(in)    :: alpha
   complex(dp), intent(in) :: zFock(ndim,ndim,numNeighborCells)
   real(dp)   , intent(out) :: Bands(nUpper-nLower+1,Nk)
@@ -191,7 +209,7 @@ subroutine Solve_C3(zFockBulk,zFock,Potential,alpha,Bands,zEigenvectors,&
   !$omp parallel do &
   !$omp private(icount,icountk,vk,vk3,ivk1,ivk2,ivk1c3,ivk2c3,nlayer,nband,zH_FockBulk1Temp,Energies,zP,zphase,iUnitCell,n1,n2,i) &
   !$omp private(zFockBulkTemp) &
-  !$omp shared(Coords,Nk,MomentaMod_C3,LatticeVectors,nLower,nUpper,Bands,zEigenvectors,nUnitCell_1,nUnitCell_2,numNeighborCells,nC3pairs,g1,g12) &
+  !$omp shared(Coords,Nk,MomentaMod_C3,tn,nLower,nUpper,Bands,zEigenvectors,nUnitCell_1,nUnitCell_2,numNeighborCells,nC3pairs,g1,g12,NearestNeighborsUC,NearestNeighborsT) &
   !$omp shared(nMomentaComponents,MomentaValues,zFock) &
   !$omp reduction(+:zFockBulk)
   do icount=1,NkMod_C3 ! loop over the NkMod_C3 momenta
@@ -201,11 +219,11 @@ subroutine Solve_C3(zFockBulk,zFock,Potential,alpha,Bands,zEigenvectors,&
     ivk2=nMomentaComponents(icountk,2)
     vk(:)=MomentaValues(ivk1+1,ivk2+1,:)
 
-    !write(*,*) icount, icountk
+    write(*,*) icount, icountk
 
     zFockBulkTemp=cmplx(0.0_dp,0.0_dp,dp)
 
-    call HamiltonianHartreeFock(zH_FockBulk1Temp,Coords,Potential,alpha,Delta,zFock,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,LatticeVectors)
+    call HamiltonianHartreeFock(zH_FockBulk1Temp,Coords,Potential,alpha,Delta,zFock,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,tn,NearestNeighborsUC,NearestNeighborsT)
 
     call diagonalize(zH_FockBulk1Temp,Energies,'V',1_dp,nUpper)
 
@@ -400,12 +418,12 @@ end subroutine Solve_C3
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 subroutine Solve(zFockBulk,zFock,Potential,alpha,Bands,zEigenvectors,&
-  Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,LatticeVectors)
+  Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,tn,NearestNeighborsUC,NearestNeighborsT)
 
   integer(dp), intent(in)    :: ndim, numk, Nk, nLower, nUpper,numNeighborCells
-  integer(dp), intent(in)    :: nMomentaComponents(Nk,2)
+  integer(dp), intent(in)    :: nMomentaComponents(Nk,2),NearestNeighborsUC(ndim,3),NearestNeighborsT(ndim,3)
   integer(dp), intent(in)    :: nUnitCell_1(numNeighborCells),nUnitCell_2(numNeighborCells)
-  real(dp)   , intent(in)    :: LatticeVectors(2,3), MomentaValues(numk,numk,2), Coords(ndim,3),Potential(ndim),alpha
+  real(dp)   , intent(in)    :: tn(2,3), MomentaValues(numk,numk,2), Coords(ndim,3),Potential(ndim),alpha
   complex(dp), intent(in) :: zFock(ndim,ndim,numNeighborCells)
   real(dp)   , intent(out) :: Bands(nUpper-nLower+1,Nk)
   complex(dp), intent(out) :: zEigenvectors(ndim,nUpper-nLower+1,Nk),zFockBulk(ndim,ndim,numNeighborCells)
@@ -424,12 +442,12 @@ subroutine Solve(zFockBulk,zFock,Potential,alpha,Bands,zEigenvectors,&
   !$omp parallel do &
   !$omp private(icount,vk,ivk1,ivk2,nband,H,Energies,zP,zphase,iUnitCell,n1,n2,i) &
   !$omp private(zFockBulkTemp) &
-  !$omp shared(Coords,Nk,LatticeVectors,nLower,nUpper,Bands,zEigenvectors,nUnitCell_1,nUnitCell_2,numNeighborCells) &
+  !$omp shared(Coords,Nk,tn,nLower,nUpper,Bands,zEigenvectors,nUnitCell_1,nUnitCell_2,numNeighborCells,NearestNeighborsUC,NearestNeighborsT) &
   !$omp shared(nMomentaComponents,MomentaValues,zFock) &
   !$omp reduction(+:zFockBulk)
   do icount=1,Nk
 
-      !write(*,*) icount
+      write(*,*) icount
 
       zFockBulkTemp=cmplx(0.0_dp,0.0_dp,dp)
 
@@ -437,7 +455,7 @@ subroutine Solve(zFockBulk,zFock,Potential,alpha,Bands,zEigenvectors,&
       ivk2=nMomentaComponents(icount,2)
       vk(:)=MomentaValues(ivk1+1,ivk2+1,:)
 
-      call HamiltonianHartreeFock(H,Coords,Potential,alpha,Delta,zFock,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,LatticeVectors)
+      call HamiltonianHartreeFock(H,Coords,Potential,alpha,Delta,zFock,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,tn,NearestNeighborsUC,NearestNeighborsT)
 
       call diagonalize(H,Energies,'V',1_dp,nUpper)
 
@@ -1009,38 +1027,57 @@ end subroutine SortEnergies_2Spins
 !c!c!cC
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-subroutine GetKineticEnergy(fsum,Coords,zFock,Delta,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,LatticeVectors)
+subroutine GetKineticEnergy(fsum,Coords,zFock,Delta,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,tn,NearestNeighborsUC,NearestNeighborsT)
 
   integer(dp), intent(in)    :: ndim, numNeighborCells
 
-  integer(dp), intent(in)    :: nUnitCell_1(numNeighborCells), nUnitCell_2(numNeighborCells)
-  real(dp)   , intent(in)    :: LatticeVectors(2,3), Coords(ndim,3), Delta
+  integer(dp), intent(in)    :: nUnitCell_1(numNeighborCells), nUnitCell_2(numNeighborCells),NearestNeighborsUC(ndim,3),NearestNeighborsT(ndim,3)
+  real(dp)   , intent(in)    :: tn(2,3), Coords(ndim,3), Delta
   complex(dp) , intent(in)   :: zFock(ndim,ndim,numNeighborCells)
   real(dp), intent(out) :: fsum
 
   integer(dp) :: i, j, icount, n1, n2
   complex(dp) :: zsum
+  real(dp) :: tm(0:6,2)
+
+  tm(0,:) = [0.0_dp, 0.0_dp]
+  tm(1,:) = tn(:,1)
+  tm(2,:) = tn(:,2)
+  tm(3,:) = tn(:,3)
+  tm(4,:) = -tn(:,1)
+  tm(5,:) = -tn(:,2)
+  tm(6,:) = -tn(:,3)
 
   zsum=cmplx(0.0_dp,0.0_dp,dp)
 
   !$omp parallel do &
   !$omp private(i,j,icount,n1,n2) &
-  !$omp shared(ndim,zFock,numNeighborCells,Coords,LatticeVectors,nUnitCell_1,nUnitCell_2) &
+  !$omp shared(ndim,zFock,numNeighborCells,Coords,tn,nUnitCell_1,nUnitCell_2,NearestNeighborsUC,NearestNeighborsT) &
   !$omp reduction(+:zsum) 
   do i = 1,ndim
    do j = 1,ndim
    
      icount=1
       
-     zsum=zsum+ft(Coords(i,:),Coords(j,:))*zFock(i,j,1)
+     if(TBKaxiras.eq.1)then
+        zsum=zsum+ftKaxiras(Coords(i,:),Coords(j,:),i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*zFock(i,j,1)
+     else
+        zsum=zsum+ft(Coords(i,:),Coords(j,:))*zFock(i,j,1)
+     endif
 
       do icount=2,numNeighborCells
         n1=nUnitCell_1(icount)
         n2=nUnitCell_2(icount)
         
-        zsum=zsum+ft(Coords(i,:), [Coords(j,1:2)-n1*LatticeVectors(:,1)-n2*LatticeVectors(:,2),Coords(j,3)])*zFock(i,j,icount)
+      if(TBKaxiras.eq.1)then
+        zsum=zsum+ftKaxiras(Coords(i,:), [Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)],i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*zFock(i,j,icount)
+        zsum=zsum+ftKaxiras(Coords(i,:), [Coords(j,1:2)+n1*tn(:,1)+n2*tn(:,2),Coords(j,3)],i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*conjg(zFock(j,i,icount))
 
-        zsum=zsum+ft(Coords(i,:), [Coords(j,1:2)+n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2),Coords(j,3)])*conjg(zFock(j,i,icount))
+      else
+        zsum=zsum+ft(Coords(i,:), [Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)])*zFock(i,j,icount)
+        zsum=zsum+ft(Coords(i,:), [Coords(j,1:2)+n1*tn(:,1)+n2*tn(:,2),Coords(j,3)])*conjg(zFock(j,i,icount))
+
+      endif
 
       enddo
 
@@ -1095,16 +1132,16 @@ end subroutine GetHartreeHubbardEnergy
 !c!c!cC
 !c!c!cC
 
-subroutine GetFockEnergy(fsum,Coords,zFock,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,LatticeVectors)
+subroutine GetFockEnergy(fsum,Coords,zFock,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,tn)
 
     integer(dp), intent(in)    :: ndim, numNeighborCells
 
     integer(dp), intent(in)    :: nUnitCell_1(numNeighborCells), nUnitCell_2(numNeighborCells)
-    real(dp)   , intent(in)    :: LatticeVectors(2,3), Coords(ndim,3)
+    real(dp)   , intent(in)    :: tn(2,3), Coords(ndim,3)
     complex(dp), intent(in)  :: zFock(ndim,ndim,numNeighborCells)
     real(dp), intent(out) :: fsum
 
-    integer(dp) :: i, j, icount, n1, n2
+    integer(dp) :: i, j, nt, icount, n1, n2
     real(dp)    :: rij
     complex(dp) :: zsum
 
@@ -1113,7 +1150,7 @@ subroutine GetFockEnergy(fsum,Coords,zFock,nUnitCell_1,nUnitCell_2,ndim,numNeigh
 
    !$omp parallel do &
    !$omp private(i,j,icount,rij,n1,n2) &
-   !$omp shared(ndim,zFock,numNeighborCells,Coords,LatticeVectors,nUnitCell_1,nUnitCell_2) &
+   !$omp shared(ndim,zFock,numNeighborCells,Coords,tn,nUnitCell_1,nUnitCell_2) &
    !$omp reduction(+:zsum) 
    do i = 1 , ndim
     do j = 1 , ndim
@@ -1128,9 +1165,9 @@ subroutine GetFockEnergy(fsum,Coords,zFock,nUnitCell_1,nUnitCell_2,ndim,numNeigh
       n1=nUnitCell_1(icount)
       n2=nUnitCell_2(icount)
 
-      zsum = zsum - 0.5_dp*fv(Coords(i,:),[Coords(j,1:2)-n1*LatticeVectors(:,1)-n2*LatticeVectors(:,2),Coords(j,3)])*conjg(zFock(i,j,icount))*zFock(i,j,icount)
+      zsum = zsum - 0.5_dp*fv(Coords(i,:),[Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)])*conjg(zFock(i,j,icount))*zFock(i,j,icount)
       
-      zsum=zsum - 0.5_dp*fv(Coords(i,:),[Coords(j,1:2)+n1*LatticeVectors(:,1)+n2*LatticeVectors(:,2),Coords(j,3)])*zFock(j,i,icount)*conjg(zFock(j,i,icount))
+      zsum=zsum - 0.5_dp*fv(Coords(i,:),[Coords(j,1:2)+n1*tn(:,1)+n2*tn(:,2),Coords(j,3)])*zFock(j,i,icount)*conjg(zFock(j,i,icount))
     
     enddo
 
@@ -1146,12 +1183,12 @@ end subroutine GetFockEnergy
 
 
 subroutine OptimalStep(Step,HartreeEnergy,FockEnergy,HubbardEnergy,KineticEnergy,zFock,zFockIn,&
-  Density,DensityIn,DensitySub,ndim,numNeighborCells,Coords,LongRange,Delta,nUnitCell_1,nUnitCell_2,LatticeVectors)
+  Density,DensityIn,DensitySub,ndim,numNeighborCells,Coords,LongRange,Delta,nUnitCell_1,nUnitCell_2,tn,NearestNeighborsUC,NearestNeighborsT)
 
-  integer(dp) , intent(in) :: ndim, numNeighborCells
+  integer(dp) , intent(in) :: ndim, numNeighborCells,NearestNeighborsUC(ndim,3),NearestNeighborsT(ndim,3)
   integer(dp) , intent(in) :: nUnitCell_1(numNeighborCells), nUnitCell_2(numNeighborCells)
   complex(dp), intent(in) :: zFock(ndim,ndim,numNeighborCells,numS), zFockIn(ndim,ndim,numNeighborCells,numS)
-  real(dp), intent(in) :: Coords(ndim,3), LongRange(ndim,ndim), LatticeVectors(2,3), Delta
+  real(dp), intent(in) :: Coords(ndim,3), LongRange(ndim,ndim), tn(2,3), Delta
   real(dp), intent(in) :: Density(ndim,numS), DensityIn(ndim,numS), DensitySub(ndim)
   real(dp), intent(inout) :: HartreeEnergy,FockEnergy(numS),HubbardEnergy,KineticEnergy(numS)
   real(dp), intent(out) :: Step
@@ -1166,8 +1203,8 @@ subroutine OptimalStep(Step,HartreeEnergy,FockEnergy,HubbardEnergy,KineticEnergy
     enddo
 
     do nspin=1,numS
-      call GetKineticEnergy(KineticEnergy(nspin),Coords,zFock(:,:,:,nspin),Delta,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,LatticeVectors)
-      call GetFockEnergy(FockEnergy(nspin),Coords,zFock(:,:,:,nspin),nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,LatticeVectors)
+      call GetKineticEnergy(KineticEnergy(nspin),Coords,zFock(:,:,:,nspin),Delta,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,tn,NearestNeighborsUC,NearestNeighborsT)
+      call GetFockEnergy(FockEnergy(nspin),Coords,zFock(:,:,:,nspin),nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,tn)
     enddo
     
     if(numS.EQ.1)then
@@ -1183,8 +1220,8 @@ subroutine OptimalStep(Step,HartreeEnergy,FockEnergy,HubbardEnergy,KineticEnergy
     enddo
     
     do nspin=1,numS
-      call GetKineticEnergy(KineticEnergy(nspin),Coords,.5_dp*(zFockIn(:,:,:,nspin)+zFock(:,:,:,nspin)),Delta,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,LatticeVectors)
-      call GetFockEnergy(FockEnergy(nspin),Coords,.5_dp*(zFockIn(:,:,:,nspin)+zFock(:,:,:,nspin)),nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,LatticeVectors)
+      call GetKineticEnergy(KineticEnergy(nspin),Coords,.5_dp*(zFockIn(:,:,:,nspin)+zFock(:,:,:,nspin)),Delta,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,tn,NearestNeighborsUC,NearestNeighborsT)
+      call GetFockEnergy(FockEnergy(nspin),Coords,.5_dp*(zFockIn(:,:,:,nspin)+zFock(:,:,:,nspin)),nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,tn)
     enddo
     
     if(numS.EQ.1)then
@@ -1213,9 +1250,9 @@ subroutine OptimalStep(Step,HartreeEnergy,FockEnergy,HubbardEnergy,KineticEnergy
 
     do nspin=1,numS
       call GetKineticEnergy(KineticEnergy(nspin),Coords,&
-        (1.0_dp-Step)*zFockIn(:,:,:,nspin)+Step*zFock(:,:,:,nspin),Delta,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,LatticeVectors)
+        (1.0_dp-Step)*zFockIn(:,:,:,nspin)+Step*zFock(:,:,:,nspin),Delta,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,tn,NearestNeighborsUC,NearestNeighborsT)
       call GetFockEnergy(FockEnergy(nspin),Coords,&
-        (1.0_dp-Step)*zFockIn(:,:,:,nspin)+Step*zFock(:,:,:,nspin),nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,LatticeVectors)
+        (1.0_dp-Step)*zFockIn(:,:,:,nspin)+Step*zFock(:,:,:,nspin),nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,tn)
     enddo
     if(numS.EQ.1)then
       call GetHartreeHubbardEnergy(HartreeEnergy,HubbardEnergy,LongRange,denstemp(:,1),denstemp(:,1),ndim)
@@ -1248,7 +1285,7 @@ pure function fv(r_i,r_j)
      fv=0._dp
 
      if(r.GT.0.01_dp)then
-        if((r2.LT.xi).or.(r2.lt.2*nlayers*tz))then
+        if((r2.LT.xi/2.0_dp).or.(r2.lt.2*nlayers*tz))then
           do n=-20,20
             fv  = fv + (-1.0_dp)**n/sqrt((x_j - x_i)**2 + (y_j - y_i)**2 + (z_j - (n*xi + z_i*(-1.0_dp)**n))**2)
           enddo

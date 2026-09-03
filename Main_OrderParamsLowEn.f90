@@ -1,3 +1,9 @@
+!
+! Equivalent compute order parameters driver for the current FORGE workspace.
+! This program reads an existing Fock matrix, constructs the real-space
+! geometry, and computes order-parameter quantities using the external
+! OrderPlot module routines.
+!
 program orderparams_lowenergy
 
 use omp_lib

@@ -10,10 +10,10 @@ contains
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-subroutine TightBindingHamiltonian(zH,Delta,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,tn,nn,nt)
+subroutine TightBindingHamiltonian(zH,Delta,Coords,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,tn,NearestNeighborsUC,NearestNeighborsT)
  
  integer(dp), intent(in)    :: ndim,numNeighborCells
- integer(dp), intent(in)    :: nUnitCell_1(numNeighborCells),nUnitCell_2(numNeighborCells),nn(ndim,3),nt(ndim,3)
+ integer(dp), intent(in)    :: nUnitCell_1(numNeighborCells),nUnitCell_2(numNeighborCells),NearestNeighborsUC(ndim,3),NearestNeighborsT(ndim,3)
  real(dp)   , intent(in)    :: tn(2,3), vk(2), Coords(ndim,3), Delta
  complex(dp), intent(out) :: zH(ndim,ndim)
  
@@ -37,7 +37,7 @@ subroutine TightBindingHamiltonian(zH,Delta,Coords,nUnitCell_1,nUnitCell_2,ndim,
       zphase=exp(cmplx(0.0_dp,-dot_product(vk,Coords(i,1:2)-Coords(j,1:2))*real(fphase,dp),dp))
      
       if(TBKaxiras.EQ.1)then
-        zH(i,j) = zH(i,j) + ftKaxiras(Coords(i,:),Coords(j,:),i,j,nn,nt,Coords,tm)*zphase
+        zH(i,j) = zH(i,j) + ftKaxiras(Coords(i,:),Coords(j,:),i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*zphase
       else
         zH(i,j) = zH(i,j) + ft(Coords(i,:),Coords(j,:))*zphase
       endif
@@ -47,14 +47,14 @@ subroutine TightBindingHamiltonian(zH,Delta,Coords,nUnitCell_1,nUnitCell_2,ndim,
             
         zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
         if(TBKaxiras.eq.1)then
-          zH(i,j)=zH(i,j)+ftKaxiras(Coords(i,:),[Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)],i,j,nn,nt,Coords,tm)*exp(-zi_vk_tn)*zphase
+          zH(i,j)=zH(i,j)+ftKaxiras(Coords(i,:),[Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)],i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*exp(-zi_vk_tn)*zphase
         else
           zH(i,j)=zH(i,j)+ft(Coords(i,:), [Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)])*exp(-zi_vk_tn)*zphase
         endif
                 
         zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
         if(TBKaxiras.eq.1)then
-          zH(i,j)=zH(i,j)+ftKaxiras(Coords(i,:),[Coords(j,1:2)+n1*tn(:,1)+n2*tn(:,2),Coords(j,3)],i,j,nn,nt,Coords,tm)*exp(-zi_vk_tn)*zphase
+          zH(i,j)=zH(i,j)+ftKaxiras(Coords(i,:),[Coords(j,1:2)+n1*tn(:,1)+n2*tn(:,2),Coords(j,3)],i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*exp(-zi_vk_tn)*zphase
         else
           zH(i,j)=zH(i,j)+ft(Coords(i,:), [Coords(j,1:2)+n1*tn(:,1)+n2*tn(:,2),Coords(j,3)])*exp(-zi_vk_tn)*zphase
         endif
@@ -250,9 +250,9 @@ end function ft
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-function ftKaxiras(r_i,r_j,i,j,nn,nt,Coords,tn)
+function ftKaxiras(r_i,r_j,i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tn)
 
-  integer(dp), intent(in) :: i,j, nn(ndim,3), nt(ndim,3)
+  integer(dp), intent(in) :: i,j, NearestNeighborsUC(ndim,3), NearestNeighborsT(ndim,3)
   real(dp), intent(in) :: r_i(3),r_j(3),tn(0:6,2), Coords(ndim,3)
   
   integer(dp) :: nni(3), nti(3), nnj(3), ntj(3)
@@ -265,10 +265,10 @@ function ftKaxiras(r_i,r_j,i,j,nn,nt,Coords,tn)
   
   if(abs(r_i(3) - r_j(3)).gt.(tz*0.1))then
 
-    nni = nn(i,:)
-    nnj = nn(j,:)
-    nti = nt(i,:)
-    ntj = nt(j,:)
+    nni = NearestNeighborsUC(i,:)
+    nnj = NearestNeighborsUC(j,:)
+    nti = NearestNeighborsT(i,:)
+    ntj = NearestNeighborsT(j,:)
 
     
 !    theta21_1 = atan2(r_j(2)-r_i(2),r_j(1)-r_i(1))&

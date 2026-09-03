@@ -52,7 +52,7 @@ character(150) :: my_iomsg
 character(1) :: dop
 
 integer(dp) :: Nk = numk*numk
-integer(dp) :: icount, n, m, i, j, nspin, it, numNeighborCells, nn(ndim,3), nt(ndim,3)
+integer(dp) :: icount, n, m, i, j, nspin, it, numNeighborCells, NearestNeighborsUC(ndim,3), NearestNeighborsT(ndim,3)
 integer(dp) :: my_iostat, rcc
 integer(dp) :: nEnergyFile,nConvergenceFile
 integer(dp) :: nFermiLevel, nOccStates(numS), nPartOccStates(numS), nWindowSort_2Spins(2,2)
@@ -173,7 +173,7 @@ tn(3,:) = t3(:)
 tn(4,:) = -t1(:)
 tn(5,:) = -t2(:)
 tn(6,:) = -t3(:)
-call getNearestNeighbors(nn,nt,Coords,ndim,tn)
+call getNearestNeighbors(NearestNeighborsUC,NearestNeighborsT,Coords,ndim,tn)
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!! Define interaction and the neighbourhood 
@@ -311,10 +311,10 @@ else
 
     if(nenforceC3.eq.1)then
         call Solve_C3(zFockBulk(:,:,:,1),zFock(:,:,:,1),Potential(:,1),alpha,Bands(:,:,1), &
-            zEigenvectors(:,:,:,1),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,RotateLayers,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),g1,g12,nC3pairs,nn,nt)
+            zEigenvectors(:,:,:,1),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,RotateLayers,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),g1,g12,nC3pairs,NearestNeighborsUC,NearestNeighborsT)
     else
         call Solve(zFockBulk(:,:,:,1),zFock(:,:,:,1),Potential(:,1),alpha,Bands(:,:,1), &
-            zEigenvectors(:,:,:,1),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),nn,nt)
+            zEigenvectors(:,:,:,1),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),NearestNeighborsUC,NearestNeighborsT)
     endif
 
     write(*,*) 'sorting...'
@@ -382,7 +382,7 @@ enddo
 write(*,*) 'get energies, ...'
 
 !do nspin=1,numS
-!        call GetKineticEnergy(KineticEnergy(nspin),Coords,zFock(:,:,:,nspin),Delta,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,reshape([t1,t2,t3],[2,3]),nn,nt)
+!        call GetKineticEnergy(KineticEnergy(nspin),Coords,zFock(:,:,:,nspin),Delta,nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,reshape([t1,t2,t3],[2,3]),NearestNeighborsUC,NearestNeighborsT)
 !        call GetFockEnergy(FockEnergy(nspin),Coords,zFock(:,:,:,nspin),nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,reshape([t1,t2,t3],[2,3]))
 !enddo
 !
@@ -464,10 +464,10 @@ do while(it.LT.itmax)
     
         if(nenforceC3.eq.1)then
             call Solve_C3(zFockBulk(:,:,:,nspin),zFock(:,:,:,nspin),Potential(:,nspin),alpha,Bands(:,:,nspin), &
-                zEigenvectors(:,:,:,nspin),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,RotateLayers,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),g1,g12,nC3pairs,nn,nt)
+                zEigenvectors(:,:,:,nspin),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,RotateLayers,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),g1,g12,nC3pairs,NearestNeighborsUC,NearestNeighborsT)
         else
             call Solve(zFockBulk(:,:,:,nspin),zFock(:,:,:,nspin),Potential(:,nspin),alpha,Bands(:,:,nspin), &
-                zEigenvectors(:,:,:,nspin),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),nn,nt)
+                zEigenvectors(:,:,:,nspin),Coords,MomentaValues,nMomentaComponents,nLower,nUpper,ndim,numk,Nk,numNeighborCells,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),NearestNeighborsUC,NearestNeighborsT)
         endif
 
 
@@ -642,7 +642,7 @@ do while(it.LT.itmax)
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !call OptimalStep(Step,HartreeEnergy,FockEnergy,HubbardEnergy,KineticEnergy,zFock,zFockIn,&
-    !    Density,DensityIn,DensitySub,ndim,numNeighborCells,Coords,LongRange,Delta,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),nn,nt)
+    !    Density,DensityIn,DensitySub,ndim,numNeighborCells,Coords,LongRange,Delta,nUnitCell_1,nUnitCell_2,reshape([t1,t2,t3],[2,3]),NearestNeighborsUC,NearestNeighborsT)
 
     !TotalEnergy = alpha*sum(FockEnergy)*real(3-numS,dp) + sum(KineticEnergy)*real(3-numS,dp) + U*HubbardEnergy + alphaH*HartreeEnergy
 
