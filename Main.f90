@@ -59,7 +59,7 @@ integer(dp) :: nFermiLevel, nOccStates(numS), nPartOccStates(numS), nWindowSort_
 
 real(dp) :: aMoire, cs, sn
 real(dp) :: t1(2), t2(2), t3(2), tn(6,2), g1(2), g12(2), RotMatrix(2,2)
-real(dp) :: DensityConvergence(2), DegFactor, FermiEnergy, Step, EnergyTolerance
+real(dp) :: DensityConvergence(2), DegFactor, FermiEnergy, Step
 real(dp) :: KineticEnergy(numS)=0.0_dp,FockEnergy(numS)=0.0_dp,HartreeEnergy=0.0_dp,HubbardEnergy=0.0_dp,TotalEnergy=0.0_dp
 real(dp) :: KineticEnergyIn(numS)=0.0_dp,FockEnergyIn(numS)=0.0_dp,HartreeEnergyIn=0.0_dp,HubbardEnergyIn=0.0_dp,TotalEnergyIn=0.0_dp
 
