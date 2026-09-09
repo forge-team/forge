@@ -342,16 +342,17 @@ end subroutine c_matrix_elements_diag
 subroutine c_matrix_elements_diag_real(A,B,C)
 
  complex(4), intent(in) :: A(:,:), B(:,:)
- real(4), intent(inout) :: C(:)
+ real(4), intent(out) :: C(:)
 
  complex(4), allocatable :: D(:,:) 
  complex(4) :: cdotc
- integer :: m, i
+ integer :: m,n, i
 
- m = size(B(:,1))
- allocate(D(m,m))
- call chemm('L','U',m,m,cmplx(1.0_4,0.0_4,4),A,m,B,m,cmplx(0.0_4,0.0_4,4),D,m)
- C = [(real(cdotc(m,B(:,i),1,D(:,i),1),4),i=1,m)]
+ m = size(B(1,:))
+ n = size(A(:,1))
+ allocate(D(n,m))
+ call chemm('L','U',m,n,cmplx(1.0_4,0.0_4,4),A,n,B,m,cmplx(0.0_4,0.0_4,4),D,m)
+ C = [(real(cdotc(n,B(:,i),1,D(:,i),1),4),i=1,m)]
  deallocate(D)
 
 end subroutine c_matrix_elements_diag_real
@@ -365,12 +366,13 @@ subroutine z_matrix_elements_diag_real(A,B,C)
 
  complex(8), allocatable :: D(:,:)
  complex(8) :: zdotc
- integer :: m, i
+ integer :: m,n, i
 
- m = size(B(:,1))
- allocate(D(m,m))
- call zhemm('L','U',m,m,cmplx(1.0_8,0.0_8,8),A,m,B,m,cmplx(0.0_8,0.0_8,8),D,m)
- C = [(real(zdotc(m,B(:,i),1,D(:,i),1),8),i=1,m)]
+ m = size(B(1,:))
+ n = size(A(:,1))
+ allocate(D(n,m))
+ call zhemm('L','U',m,n,cmplx(1.0_8,0.0_8,8),A,n,B,m,cmplx(0.0_8,0.0_8,8),D,m)
+ C = [(real(zdotc(n,B(:,i),1,D(:,i),1),8),i=1,m)]
  deallocate(D)
 
 end subroutine z_matrix_elements_diag_real
@@ -382,14 +384,14 @@ end subroutine z_matrix_elements_diag_real
 !%
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-subroutine zdiagRed(A,eigenvalues,ev,nLower,nUpper)
+subroutine zdiagRed(A,eigenvalues,ev,il,iu)
 
   implicit none
 
   complex(8), intent(inout) :: A(:,:)
   real(8)   , intent(inout) :: eigenvalues(:)
   character(1) , intent(in) :: ev
-  integer(8) , intent(in)      :: nLower , nUpper
+  integer(8) , intent(in)      :: il , iu
  
   integer(4) :: info, m, lwork, lrwork, liwork,il4,iu4
   real(8)    :: vl, vu, abstol, dlamch
@@ -402,12 +404,12 @@ subroutine zdiagRed(A,eigenvalues,ev,nLower,nUpper)
    stop
   end if
 
-  il4=nLower
+  il4=il
 
-  iu4=nUpper
+  iu4=iu
 
-  allocate( isuppz(2*(nUpper-nLower+1)) )
-  allocate( z(size(A,1),nUpper-nLower+1) )
+  allocate( isuppz(2*(iu-il+1)) )
+  allocate( z(size(A,1),iu-il+1) )
   allocate(  work(1) )
   allocate( rwork(1) )
   allocate( iwork(1) )
@@ -429,7 +431,7 @@ subroutine zdiagRed(A,eigenvalues,ev,nLower,nUpper)
   call zheevr(ev,'I','L',size(A,1),A,size(A,1),vl,vu,il4,iu4,dlamch('S'),m,eigenvalues,&
               z,size(A,1),isuppz,work,lwork,rwork,lrwork,iwork,liwork,info)
 
-  A(:,1:nUpper-nLower+1) = z
+  A(:,1:iu-il+1) = z
 
   if(info.ne.0) write(*,*) 'zheev failed' , info
 
@@ -443,14 +445,14 @@ end subroutine zdiagRed
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-subroutine cdiagRed(A,eigenvalues,ev,nLower,nUpper)
+subroutine cdiagRed(A,eigenvalues,ev,il,iu)
 
   implicit none
 
   complex, intent(inout) :: A(:,:)
   real   , intent(inout) :: eigenvalues(:)
   character(1) , intent(in) :: ev
-  integer , intent(in)      :: nLower , nUpper
+  integer , intent(in)      :: il , iu
  
   integer :: info, m, lwork, lrwork, liwork
   real    :: vl, vu, abstol, dlamch
@@ -463,8 +465,8 @@ subroutine cdiagRed(A,eigenvalues,ev,nLower,nUpper)
    stop
   end if
 
-  allocate( isuppz(2*(nUpper-nLower+1)) )
-  allocate( z(size(A,1),nUpper-nLower+1) )
+  allocate( isuppz(2*(iu-il+1)) )
+  allocate( z(size(A,1),iu-il+1) )
   allocate(  work(1) )
   allocate( rwork(1) )
   allocate( iwork(1) )
@@ -472,7 +474,7 @@ subroutine cdiagRed(A,eigenvalues,ev,nLower,nUpper)
   lwork = -1
   lrwork= -1
   liwork= -1
-  call cheevr(ev,'I','L',size(A,1),A,size(A,1),vl,vu,nLower,nUpper,dlamch('S'),m,eigenvalues,&
+  call cheevr(ev,'I','L',size(A,1),A,size(A,1),vl,vu,il,iu,dlamch('S'),m,eigenvalues,&
               z,size(A,1),isuppz,work,lwork,rwork,lrwork,iwork,liwork,info)
 
   lwork  = int( work(1))
@@ -483,10 +485,10 @@ subroutine cdiagRed(A,eigenvalues,ev,nLower,nUpper)
   allocate(rwork(lrwork))
   allocate(iwork(liwork))
 
-  call cheevr(ev,'I','L',size(A,1),A,size(A,1),vl,vu,nLower,nUpper,dlamch('S'),m,eigenvalues,&
+  call cheevr(ev,'I','L',size(A,1),A,size(A,1),vl,vu,il,iu,dlamch('S'),m,eigenvalues,&
               z,size(A,1),isuppz,work,lwork,rwork,lrwork,iwork,liwork,info)
 
-  A(:,1:nUpper-nLower+1) = z
+  A(:,1:iu-il+1) = z
 
   if(info.ne.0) write(*,*) 'cheev failed' , info
 

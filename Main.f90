@@ -54,7 +54,7 @@ character(1) :: dop
 integer(dp) :: Nk = numk*numk
 integer(dp) :: icount, n, m, i, j, nspin, it, numNeighborCells, NearestNeighborsUC(ndim,3), NearestNeighborsT(ndim,3)
 integer(dp) :: my_iostat, rcc
-integer(dp) :: nEnergyFile,nConvergenceFile
+integer(dp) :: nEnergyFile,nConvergenceFile,nMuFile
 integer(dp) :: nFermiLevel, nOccStates(numS), nPartOccStates(numS), nWindowSort_2Spins(2,2)
 
 real(dp) :: aMoire, cs, sn
@@ -385,6 +385,10 @@ write(filename,'(A7,A11,A210)') dir,'Convergence',parameters
 nConvergenceFile=68
 open(nConvergenceFile+1,file=filename,status='replace')
 
+write(filename,'(A7,A11,A210)') dir,'Mu',parameters
+nMuFile=70
+open(nMuFile+1,file=filename,status='replace')
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!! Self-consistency loop !!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -393,6 +397,44 @@ it = 0
 do while(it.LT.itmax)
     it=it+1
     write(*,*) 'it=',it
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+    !!!!!!!!!!!!!!!!! Output Fock !!!!!!!!!!!!!!!!!!!!!!!
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+
+    write(*,*) 'writing Fock ...'
+
+    if (nWriteFock.EQ.1) then
+
+        do nspin=1,numS
+            write(filename,'(A9,A10,I0,A210)') dirFock,'Fock-nspin',nspin,parameters
+            open(91, file = filename, status = 'replace', form='UNFORMATTED', &
+                ACCESS='direct', recl = 2*dp, iostat=my_iostat, iomsg=my_iomsg)
+            if(my_iostat /= 0) then
+                write(*,*) 'Write Fock failed with iostat = ', my_iostat, ' iomsg = '//trim(my_iomsg)
+            endif
+            
+            rcc=0
+                    do i=1,ndim
+                        do j=1,i
+                            rcc = rcc+1
+                            write(91,rec=rcc, iostat=my_iostat, iomsg=my_iomsg) zFock(i,j,1,nspin)
+                        enddo
+                    enddo
+            do m=2,numNeighborCells
+                    do i=1,ndim
+                        do j=1,ndim
+                            rcc = rcc+1
+                            write(91,rec=rcc, iostat=my_iostat, iomsg=my_iomsg) zFock(i,j,m,nspin)
+                        enddo
+                    enddo
+            enddo
+            close(91)
+  
+        enddo
+
+        
+    endif
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !!!!!!!!!!! Get new fock0
@@ -668,43 +710,9 @@ do while(it.LT.itmax)
         write(nEnergyFile+1,fmt='(F24.9,3X)') HubbardEnergyIn
     endif
 
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
-    !!!!!!!!!!!!!!!!! Output Fock !!!!!!!!!!!!!!!!!!!!!!!
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+    write(nMuFile+1,fmt='(F5.1,3X)', advance="no") real(it,dp)
+    write(nMuFile+1,fmt='(F24.9,3X)') FermiEnergy
 
-    write(*,*) 'writing Fock ...'
-
-    if (nWriteFock.EQ.1) then
-
-        do nspin=1,numS
-            write(filename,'(A9,A10,I0,A210)') dirFock,'Fock-nspin',nspin,parameters
-            open(91, file = filename, status = 'replace', form='UNFORMATTED', &
-                ACCESS='direct', recl = 2*dp, iostat=my_iostat, iomsg=my_iomsg)
-            if(my_iostat /= 0) then
-                write(*,*) 'Write Fock failed with iostat = ', my_iostat, ' iomsg = '//trim(my_iomsg)
-            endif
-            
-            rcc=0
-                    do i=1,ndim
-                        do j=1,i
-                            rcc = rcc+1
-                            write(91,rec=rcc, iostat=my_iostat, iomsg=my_iomsg) zFock(i,j,1,nspin)
-                        enddo
-                    enddo
-            do m=2,numNeighborCells
-                    do i=1,ndim
-                        do j=1,ndim
-                            rcc = rcc+1
-                            write(91,rec=rcc, iostat=my_iostat, iomsg=my_iomsg) zFock(i,j,m,nspin)
-                        enddo
-                    enddo
-            enddo
-            close(91)
-  
-        enddo
-
-        
-    endif
 
 enddo  !while loop
 
