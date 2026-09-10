@@ -29,7 +29,7 @@ real(dp) :: vk(2)
 real(dp), allocatable :: Energies(:)
 complex(dp), allocatable :: zH(:,:)
 
-real(dp) :: aMoire, cs, sn, FermiEnergy, DegFactor, EnergyTolerance = 0.00001_dp
+real(dp) :: aMoire, cs, sn, FermiEnergy, DegFactor
 real(dp) :: t1(2), t2(2), t3(2), tn(6,2), g1(2), g12(2), RotMatrix(2,2)
 integer(dp) :: TnTonUnitCell12(0:6,2)
 
@@ -346,7 +346,7 @@ do nspin=1,numS
     write(filename,'(A7,A29,I0,A210)') dir,'InterSubInterVal-numb20-nspin',nspin,parameters
     open(98,file=filename,status='replace')
     do i=1,ndim/2
-        write(98,*) real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i)), real(fKB_conjxfKpA(i)), aimag(fKB_conjxfKpA(i))
+        write(98,'(4(ES12.5,3X))') real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i)), real(fKB_conjxfKpA(i)), aimag(fKB_conjxfKpA(i))
     enddo
     close(98)
 
@@ -354,7 +354,7 @@ do nspin=1,numS
     write(filename,'(A7,A29,I0,A210)') dir,'IntraSubInterVal-numb20-nspin',nspin,parameters
     open(98,file=filename,status='replace')
     do i=1,ndim
-        write(98,*) real(fKp_conjxfK(i)), aimag(fKp_conjxfK(i))
+        write(98,'(2(ES12.5,3X))') real(fKp_conjxfK(i)), aimag(fKp_conjxfK(i))
     enddo
     close(98)
 
@@ -362,10 +362,10 @@ do nspin=1,numS
     write(filename,'(A7,A29,I0,A210)') dir,'InterSubIntraVal-numb20-nspin',nspin,parameters
     open(98,file=filename,status='replace')
     do i=1,ndim/2
-        write(98,*) real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i))
+        write(98,'(2(ES12.5,3X))') real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i))
     enddo
     do i=1,ndim/2
-        write(98,*) real(fKB_conjxfKpA(i)), aimag(fKB_conjxfKpA(i))
+        write(98,'(2(ES12.5,3X))') real(fKB_conjxfKpA(i)), aimag(fKB_conjxfKpA(i))
     enddo
     close(98)
 
@@ -373,7 +373,7 @@ do nspin=1,numS
     write(filename,'(A7,A29,I0,A210)') dir,'IntraSubIntraVal-numb20-nspin',nspin,parameters
     open(98,file=filename,status='replace')
     do i=1,ndim
-        write(98,*) ValleyPol(i), NormSquared(i)
+        write(98,'(2(ES12.5,3X))') ValleyPol(i), NormSquared(i)
     enddo
     close(98)
 
@@ -420,7 +420,7 @@ do nspin=1,numS
     write(filename,'(A7,A28,I0,A210)') dir,'InterSubInterVal-numb4-nspin',nspin,parameters
     open(98,file=filename,status='replace')
     do i=1,ndim/2
-        write(98,*) real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i)), real(fKB_conjxfKpA(i)), aimag(fKB_conjxfKpA(i))
+        write(98,'(4(ES12.5,3X))') real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i)), real(fKB_conjxfKpA(i)), aimag(fKB_conjxfKpA(i))
     enddo
     close(98)
 
@@ -428,7 +428,7 @@ do nspin=1,numS
     write(filename,'(A7,A28,I0,A210)') dir,'IntraSubInterVal-numb4-nspin',nspin,parameters
     open(98,file=filename,status='replace')
     do i=1,ndim
-        write(98,*) real(fKp_conjxfK(i)), aimag(fKp_conjxfK(i))
+        write(98,'(2(ES12.5,3X))') real(fKp_conjxfK(i)), aimag(fKp_conjxfK(i))
     enddo
     close(98)
 
@@ -436,10 +436,10 @@ do nspin=1,numS
     write(filename,'(A7,A28,I0,A210)') dir,'InterSubIntraVal-numb4-nspin',nspin,parameters
     open(98,file=filename,status='replace')
     do i=1,ndim/2
-        write(98,*) real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i))
+        write(98,'(2(ES12.5,3X))') real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i))
     enddo
     do i=1,ndim/2
-        write(98,*) real(fKB_conjxfKpA(i)), aimag(fKB_conjxfKpA(i))
+        write(98,'(2(ES12.5,3X))') real(fKB_conjxfKpA(i)), aimag(fKB_conjxfKpA(i))
     enddo
     close(98)
 
@@ -447,7 +447,7 @@ do nspin=1,numS
     write(filename,'(A7,A28,I0,A210)') dir,'IntraSubIntraVal-numb4-nspin',nspin,parameters
     open(98,file=filename,status='replace')
     do i=1,ndim
-        write(98,*) ValleyPol(i), NormSquared(i)
+        write(98,'(2(ES12.5,3X))') ValleyPol(i), NormSquared(i)
     enddo
     close(98)
 

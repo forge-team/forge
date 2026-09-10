@@ -186,7 +186,7 @@ do nspin = 1, numS
     write(filename,'(A7,A21,I0,A6,I0,A210)') dir,'InterSubInterVal-numb',ndim,'-nspin',nspin,parameters
     open(98,file=filename,status='replace')
     do i = 1, ndim/2
-        write(98,fmt='(E12.5,3X,E12.5,3X,E12.5,3X,E12.5)') real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i)), real(fKB_conjxfKpA(i)), aimag(fKB_conjxfKpA(i))
+        write(98,'(4(ES12.5,3X))') real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i)), real(fKB_conjxfKpA(i)), aimag(fKB_conjxfKpA(i))
     end do
     close(98)
 
@@ -194,7 +194,7 @@ do nspin = 1, numS
     write(filename,'(A7,A21,I0,A6,I0,A210)') dir,'IntraSubInterVal-numb',ndim,'-nspin',nspin,parameters
     open(98,file=filename,status='replace')
     do i = 1, ndim
-        write(98,*) real(fKp_conjxfK(i)), aimag(fKp_conjxfK(i))
+        write(98,'(2(ES12.5,3X))') real(fKp_conjxfK(i)), aimag(fKp_conjxfK(i))
     end do
     close(98)
 
@@ -202,10 +202,10 @@ do nspin = 1, numS
     write(filename,'(A7,A21,I0,A6,I0,A210)') dir,'InterSubIntraVal-numb',ndim,'-nspin',nspin,parameters
     open(98,file=filename,status='replace')
     do i = 1, ndim/2
-        write(98,*) real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i))
+        write(98,'(2(ES12.5,3X))') real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i))
     end do
     do i = 1, ndim/2
-        write(98,*) real(fKB_conjxfKpA(i)), aimag(fKB_conjxfKpA(i))
+        write(98,'(2(ES12.5,3X))') real(fKB_conjxfKpA(i)), aimag(fKB_conjxfKpA(i))
     end do
     close(98)
 
@@ -213,7 +213,7 @@ do nspin = 1, numS
     write(filename,'(A7,A21,I0,A6,I0,A210)') dir,'IntraSubIntraVal-numb',ndim,'-nspin',nspin,parameters
     open(98,file=filename,status='replace')
     do i = 1, ndim
-        write(98,*) ValleyPol(i), NormSquared(i)
+        write(98,'(2(ES12.5,3X))') ValleyPol(i), NormSquared(i)
     end do
     close(98)
 
