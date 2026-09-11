@@ -22,7 +22,7 @@ character(150) :: my_iomsg
 character(1) :: dop
 
 integer(dp) :: Nk, icount, n, m, i, j, nspin, numNeighborCells, nband
-integer(dp) :: nFermiLevel, nOccStates(numS), nPartOccStates(numS)
+integer(dp) :: nFermiLevel, nOccStates(numS), nPartOccStates(numS), nWindowSort_2Spins(2,2)
 integer(dp) :: rcc, ivk1, ivk2
 
 real(dp) :: vk(2)
@@ -44,7 +44,7 @@ integer(dp), allocatable :: KekuleNeighbors(:,:,:), KekuleLattice(:,:,:)
 
 real(dp), allocatable :: Coords(:,:)
 real(dp), allocatable :: MomentaValues(:,:,:)
-real(dp), allocatable :: Bands(:,:,:), SortedEnergies_1Spin(:,:)
+real(dp), allocatable :: Bands(:,:,:), SortedEnergies_1Spin(:,:), SortedEnergies_2Spins(:,:)
 real(dp), allocatable :: Density(:,:), DensitySub(:)
 real(dp), allocatable :: LongRange(:,:), Potential(:,:)
 real(dp), allocatable :: ValleyPol(:), NormSquared(:)
@@ -79,6 +79,9 @@ allocate(Bands(1:numb, 1:Nk, 1:numS))
 allocate(zSortedEigenvectors(1:ndim, 1:numb*Nk, 1:numS))
 allocate(nSortedMomenta(1:numb*Nk, 1:2, 1:numS))
 allocate(SortedEnergies_1Spin(1:numb*Nk, 1:numS))
+if(numS.EQ.2)then
+    allocate(SortedEnergies_2Spins(1:2*numb*numk*numk,1:2))
+endif
 
 allocate(nUnitCell_1(1:numNeighborCells))
 allocate(nUnitCell_2(1:numNeighborCells))
@@ -292,31 +295,71 @@ enddo
 
 if(numS.EQ.1)then
 
-    nspin=1
+        nspin=1
 
-    nFermiLevel = numS*nint(real(numk*numk*NeutralityPoint,dp)+real(numk*numk,dp)/2.0_dp*nfilling)
-    FermiEnergy = (SortedEnergies_1Spin(nFermiLevel,1)+SortedEnergies_1Spin(nFermiLevel+1,1))/2.
+        nFermiLevel=numS*nint(real(numk*numk*NeutralityPoint,dp)+real(numk*numk,dp)/2.0_dp*nfilling)
+        FermiEnergy=(SortedEnergies_1Spin(nFermiLevel,1)+SortedEnergies_1Spin(nFermiLevel+1,1))/2.
+        nOccStates(1) = 0
+        nPartOccStates(1) = 0
+        do icount=1,Nk*numb
+            if((SortedEnergies_1Spin(icount,1) - FermiEnergy).lt.-EnergyTolerance)then
+                nOccStates(1) = nOccStates(1) + 1
+            else if(abs(SortedEnergies_1Spin(icount,1) - FermiEnergy).lt.EnergyTolerance)then
+                nOccStates(1) = nOccStates(1) + 1
+                nPartOccStates(1) = nPartOccStates(1) + 1
+            endif
+        enddo
 
-    nOccStates(1)     = 0
-    nPartOccStates(1) = 0
-    do icount=1,nFermiLevel+Nk/2
-        if((SortedEnergies_1Spin(icount,1) - FermiEnergy).lt.-EnergyTolerance)then
-            nOccStates(1) = nOccStates(1) + 1
-        else if(abs(SortedEnergies_1Spin(icount,1) - FermiEnergy).lt.EnergyTolerance)then
-            nPartOccStates(1) = nPartOccStates(1) + 1
-            nOccStates(1)     = nOccStates(1) + 1
+        if(nPartOccStates(1).gt.0)then
+            DegFactor = 1.0_dp/real(nPartOccStates(1),dp)*real(nFermiLevel+nPartOccStates(1)-nOccStates(1),dp)
+        else
+            DegFactor = 0.0_dp
         endif
-    enddo
+        write(*,*) 'Sorted energies',nspin, nOccStates(1), nPartOccStates(1), DegFactor
 
-    if(nPartOccStates(1).gt.0)then
-        DegFactor = 1.0_dp/real(nPartOccStates(1),dp)*real(nFermiLevel+nPartOccStates(1)-nOccStates(1),dp)
     else
-        DegFactor = 0.0_dp
+
+        nWindowSort_2Spins(1,1) = NeutralityPoint - 1
+        nWindowSort_2Spins(2,1) = NeutralityPoint + 2 +1
+        nWindowSort_2Spins(1,2) = NeutralityPoint - 1
+        nWindowSort_2Spins(2,2) = NeutralityPoint + 2 +1
+
+        call SortEnergies_2Spins(numk,numb,nWindowSort_2Spins,SortedEnergies_1Spin,SortedEnergies_2Spins)
+        
+        nFermiLevel = numS*nint(real(numk*numk*NeutralityPoint,dp)+real(numk*numk,dp)/2.0_dp*nfilling)
+        FermiEnergy = (SortedEnergies_2Spins(nFermiLevel,1)+SortedEnergies_2Spins(nFermiLevel+1,1))/2.
+
+        nOccStates(1) = 0
+        nPartOccStates(1) = 0
+        nOccStates(2) = 0
+        nPartOccStates(2) = 0
+        do icount = 1, 2*numb*Nk
+            if(SortedEnergies_2Spins(icount,2).EQ.1)then
+                if((SortedEnergies_2Spins(icount,1) - FermiEnergy).lt.-EnergyTolerance)then
+                    nOccStates(1)  = nOccStates(1)  + 1
+                else if(abs(SortedEnergies_2Spins(icount,1) - FermiEnergy).lt.EnergyTolerance)then
+                    nPartOccStates(1) = nPartOccStates(1) + 1
+                    nOccStates(1)  = nOccStates(1)  + 1
+                endif
+            else
+                if((SortedEnergies_2Spins(icount,1) - FermiEnergy).lt.-EnergyTolerance)then
+                    nOccStates(2)  = nOccStates(2)  + 1
+                else if(abs(SortedEnergies_2Spins(icount,1) - FermiEnergy).lt.EnergyTolerance)then
+                    nPartOccStates(2) = nPartOccStates(2) + 1
+                    nOccStates(2)  = nOccStates(2)  + 1
+                endif
+            endif
+        enddo
+
+        if((nPartOccStates(1).ne.0).or.(nPartOccStates(2).ne.0))then
+            DegFactor = 1.0_dp/real(nPartOccStates(1)+nPartOccStates(2),dp)*real(nFermiLevel+nPartOccStates(1)+nPartOccStates(2)-nOccStates(1)-nOccStates(2),dp)
+        else
+            DegFactor = 0.0_dp
+        endif
+
+        write(*,*) 'Sorted energies', 1, nOccStates(1), nPartOccStates(1), 2, nOccStates(2), nPartOccStates(2), DegFactor
+        
     endif
-
-    write(*,*) 'Chemical PotentialDeg', nspin, nFermiLevel, nOccStates(1), nPartOccStates(1)
-
-endif
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!  Get Fock from eigenstates (numb bands)
