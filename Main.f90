@@ -46,10 +46,8 @@ implicit none
 !!!!!!!!!!!!!!!!!  Variable declaration !!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-character(250) :: filename
-character(210) :: parameters, parametersIn
+character(300) :: filename
 character(150) :: my_iomsg
-character(1) :: dop
 
 integer(dp) :: Nk = numk*numk
 integer(dp) :: icount, n, m, i, j, nspin, it, numNeighborCells, NearestNeighborsUC(ndim,3), NearestNeighborsT(ndim,3)
@@ -184,31 +182,12 @@ call LongRangeInteraction(LongRange,Coords,ndim,t1,t2)
 !!!!!!!!!!  Initialization !!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-if(nfilling.LT.0._dp)then
-    dop='-'
-else
-    dop='+'
-endif
+call InitParameters()
 
-write(parameters,'(A1,A3,A8,A1,F3.1,A5,I0,A2,I0,A8,I0,A6,I0,A4,F0.1,A2,F4.2,A7,I0,A3,F0.1,A6,F0.3,A5,I0,A5,I0,A5,I0,A3,I0,A4)')&
-     '-',statename,'-filling',dop,abs(nfilling),'-numS',numS,'-i',ntheta,'-nlayers',nlayers,'-relax',nrelax,&
-     '-eps',epsilon,'-U',U,'-screen',nscreen,'-xi',xi*0.246_dp,'-delta',Delta,&
-     '-numI',numI,'-numC',numC,'-numk',numk,'-dp',dp,'.dat'
 write(*,*) 'parameters',parameters
 
 
 if(nRead.EQ.1)then
-
-    if(nfillingIn.LT.0._dp)then
-        dop='-'
-    else
-        dop='+'
-    endif
-    
-    write(parametersIn,'(A1,A3,A8,A1,F3.1,A5,I0,A2,I0,A8,I0,A6,I0,A4,F0.1,A2,F4.2,A7,I0,A3,F0.1,A6,F0.3,A5,I0,A5,I0,A5,I0,A3,I0,A4)')&
-     '-',statenameIn,'-filling',dop,abs(nfillingIn),'-numS',numSIn,'-i',ntheta,'-nlayers',nlayers,'-relax',nrelaxIn,&
-     '-eps',epsilonIn,'-U',UIn,'-screen',nscreenIn,'-xi',xiIn*0.246_dp,'-delta',DeltaIn,&
-     '-numI',numIIn,'-numC',numCIn,'-numk',numkIn,'-dp',dpIn,'.dat'
     
     write(*,*) 'parametersIn',parametersIn
 
@@ -385,7 +364,7 @@ write(filename,'(A7,A11,A210)') dir,'Convergence',parameters
 nConvergenceFile=68
 open(nConvergenceFile+1,file=filename,status='replace')
 
-write(filename,'(A7,A11,A210)') dir,'Mu',parameters
+write(filename,'(A7,A2,A210)') dir,'Mu',parameters
 nMuFile=70
 open(nMuFile+1,file=filename,status='replace')
 

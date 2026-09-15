@@ -16,10 +16,8 @@ use lapack_routines
 
 implicit none
 
-character(250) :: filename
-character(210) :: parameters
+character(300) :: filename
 character(150) :: my_iomsg
-character(1) :: dop
 
 integer(dp) :: Nk, icount, n, m, i, j, nspin, numNeighborCells, nband
 integer(dp) :: nFermiLevel, nOccStates(numS), nPartOccStates(numS), nWindowSort_2Spins(2,2)
@@ -174,12 +172,7 @@ call LongRangeInteraction(LongRange, Coords, ndim, t1, t2)
 !!  File name strings
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-if(nfilling.LT.0._dp)then; dop='-'; else; dop='+'; endif
-
-write(parameters,'(A1,A3,A8,A1,F3.1,A5,I0,A2,I0,A8,I0,A6,I0,A4,F0.1,A2,F4.2,A7,I0,A3,F0.1,A6,F0.3,A5,I0,A5,I0,A5,I0,A3,I0,A4)')&
-     '-',statename,'-filling',dop,abs(nfilling),'-numS',numS,'-i',ntheta,'-nlayers',nlayers,'-relax',nrelax,&
-     '-eps',epsilon,'-U',U,'-screen',nscreen,'-xi',xi*0.246_dp,'-delta',Delta,&
-     '-numI',numI,'-numC',numC,'-numk',numk,'-dp',dp,'.dat'
+call InitParameters()
 
 write(*,*) 'parameters',   parameters
 

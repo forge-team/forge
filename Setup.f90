@@ -48,6 +48,12 @@ integer(dp), parameter :: numIIn = 1                      ! numI of initial gues
 integer(dp), parameter :: numCIn = 10                      ! numc of initial guess
 integer(dp), parameter :: nscreenIn = 2                       ! scr of initial guess
 real(dp), parameter:: xiIn = 10.0_dp/0.246_dp              ! xi of initial guess
+integer(dp), parameter:: nenforceC3In = 1                  ! nenforceC3 of initial guess
+integer(dp), parameter:: nenforceC2In = 0                  ! nenforceC2 of initial guess
+integer(dp), parameter:: nenforceTIn = 0                   ! nenforceT of initial guess
+integer(dp), parameter:: nenforceC2TIn = 1                 ! nenforceC2T of initial guess
+integer(dp), parameter:: nenforceValleyIn = 0              ! nenforceValley of initial guess
+
 
 real(dp), parameter :: EnergyTolerance=0.0001_dp         ! energies within tolerance are considered degenerate when computing the Fock matrix  
 real(dp), parameter :: StepAlternative = 1.0_dp          ! value of step when the ODA algo does not provide it (the energy increases for any value)
@@ -92,5 +98,147 @@ real(dp), parameter :: a1(2) = [ 0.5_dp,sqrt(3.0_dp)*0.5_dp]       ! graphene la
 real(dp), parameter :: a2(2) = [-0.5_dp,sqrt(3.0_dp)*0.5_dp]       ! graphene lattice vectors
 
 real(dp), parameter :: pi = 4.0_dp*atan(1.0_dp)        ! pi=3.141592
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! Filename suffixes built at runtime by InitParameters (not constants: they format reals/ints)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+character(210) :: parameters                             ! suffix encoding the parameters of the run
+character(210) :: parametersIn                           ! suffix encoding the parameters of the initial guess
+
+private :: rstr, istr, cstr, AssignSuffix             ! helpers used only to build the suffixes
+
+contains
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! real -> shortest string with nd decimals. A wide Fw.d field keeps the leading zero ('0.0',
+!! not '.0' as F0.d would give) and adjustl/trim then removes the padding: no width to overflow.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+function rstr(x,nd,plus) result(s)
+
+real(dp), intent(in) :: x
+integer, intent(in) :: nd
+logical, intent(in), optional :: plus                    ! .true. -> always show the sign, as in '+0.0'
+character(:), allocatable :: s
+character(40) :: buffer, fmt
+logical :: signed
+
+signed = .false.
+if(present(plus)) signed = plus
+
+if(signed)then
+    write(fmt,'(A,I0,A)') '(SP,F39.',nd,')'
+else
+    write(fmt,'(A,I0,A)') '(F39.',nd,')'
+endif
+
+write(buffer,fmt) x
+s = trim(adjustl(buffer))
+
+end function rstr
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! integer -> shortest string
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+function istr(n) result(s)
+
+integer(dp), intent(in) :: n
+character(:), allocatable :: s
+character(40) :: buffer
+
+write(buffer,'(I0)') n
+s = trim(adjustl(buffer))
+
+end function istr
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! Enforced symmetries as five digits: C3, C2, T, C2T, valley. C2, T and C2T are not independent
+!! (C2 x T = C2T), so enforcing any two of them enforces the third and all three are tagged as 1.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+function cstr(mC3,mC2,mT,mC2T,mValley) result(s)
+
+integer(dp), intent(in) :: mC3, mC2, mT, mC2T, mValley
+character(:), allocatable :: s
+integer(dp) :: nC2, nT, nC2T
+
+nC2  = mC2
+nT   = mT
+nC2T = mC2T
+
+if(nC2+nT+nC2T.EQ.2_dp)then                              ! any two of C2, T, C2T enforce the third
+    nC2  = 1_dp
+    nT   = 1_dp
+    nC2T = 1_dp
+endif
+
+s = '-constrain'//istr(mC3)//istr(nC2)//istr(nT)//istr(nC2T)//istr(mValley)
+
+end function cstr
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! Copies the suffix into its fixed-length variable, stopping instead of silently truncating
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+subroutine AssignSuffix(suffix,s,label)
+
+character(*), intent(out) :: suffix
+character(*), intent(in) :: s, label
+
+if(len(s).GT.len(suffix))then
+    write(*,*) 'ERROR: ',label,' needs ',len(s),' characters, only ',len(suffix),' declared'
+    stop 1
+endif
+
+suffix = s
+
+end subroutine AssignSuffix
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! Builds 'parameters' and 'parametersIn'. Must be called as the first executable statement of
+!! every program that uses Setup, before any filename is written.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+subroutine InitParameters()
+
+character(:), allocatable :: s
+
+s = '-'//trim(statename)//'-numS'//istr(numS)//cstr(nenforceC3,nenforceC2,nenforceT,nenforceC2T,nenforceValley)// &
+    '-filling'//rstr(nfilling,1,plus=.true.)// &
+    '-i'//istr(ntheta)// &
+    '-nlayers'//istr(nlayers)// &
+    '-relax'//istr(nrelax)// &
+    '-eps'//rstr(epsilon,1)// &
+    '-U'//rstr(U,2)// &
+    '-screen'//istr(nscreen)// &
+    '-xi'//rstr(xi*0.246_dp,1)// &
+    '-delta'//rstr(Delta*1000.0_dp,1)// &                ! tagged in meV, Delta is in eV
+    '-numI'//istr(numI)// &
+    '-numk'//istr(numk)// &
+    '-dp'//istr(int(dp,dp))//'.dat'                      ! dp is a default integer, unlike the rest
+
+call AssignSuffix(parameters,s,'parameters')
+
+s = '-'//trim(statenameIn)//'-numS'//istr(numSIn)//cstr(nenforceC3In,nenforceC2In,nenforceTIn,nenforceC2TIn,nenforceValleyIn)// &
+    '-filling'//rstr(nfillingIn,1,plus=.true.)// &
+    '-i'//istr(ntheta)// &
+    '-nlayers'//istr(nlayers)// &
+    '-relax'//istr(nrelaxIn)// &
+    '-eps'//rstr(epsilonIn,1)// &
+    '-U'//rstr(UIn,2)// &
+    '-screen'//istr(nscreenIn)// &
+    '-xi'//rstr(xiIn*0.246_dp,1)// &
+    '-delta'//rstr(DeltaIn*1000.0_dp,1)// &
+    '-numI'//istr(numIIn)// &
+    '-numk'//istr(numkIn)// &
+    '-dp'//istr(dpIn)//'.dat'
+
+call AssignSuffix(parametersIn,s,'parametersIn')
+
+end subroutine InitParameters
 
 end module Setup
