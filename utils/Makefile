@@ -15,18 +15,21 @@ LIBS = -Wl,--start-group \
        -Wl,--end-group \
        -lpthread -lm
 
-# Source files
+# Driver: Main_OrderParamsFull.f90 or Main_OrderParamsLowEn.f90
+MAIN =
+
+# Source files (modules from the parent folder)
 SRC = \
-    LapackRoutines.f90 \
+    ../LapackRoutines.f90 \
     Setup.f90 \
-    TightBinding.f90 \
-    Geometry.f90 \
-    HartreeFock.f90 \
-    OrderParameter.f90 \
-    Main.f90
+    ../TightBinding.f90 \
+    ../Geometry.f90 \
+    ../HartreeFock.f90 \
+    ../OrderParameter.f90 \
+    $(MAIN)
 
 # Executable
-TARGET = f.out
+TARGET = op.out
 
 all:
 	$(FC) -o $(TARGET) $(FFLAGS) $(INCLUDES) $(SRC) $(LIBS)
@@ -35,5 +38,4 @@ clean:
 	rm -f *.o *.mod $(TARGET)
 
 run: all
-	mkdir -p output dataFock
-	bash -c "source setMemory.sh && nohup ./f.out &"
+	cd .. && mkdir -p output && bash -c "source setMemory.sh && nohup ./utils/$(TARGET) &"

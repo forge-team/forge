@@ -88,29 +88,17 @@ subroutine HamiltonianHartreeFock(zH,Coords,Potential,alpha,Delta,zFock,nUnitCel
 
       zH(i,j)=zH(i,j)-alpha*fv(Coords(i,:),Coords(j,:))*conjg(zFock(i,j,1))*zphase
      
-      if(TBKaxiras.eq.1)then
-        zH(i,j) = zH(i,j)+ftKaxiras(Coords(i,:),Coords(j,:),i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*zphase
-      else
-        zH(i,j) = zH(i,j)+ft(Coords(i,:), Coords(j,:))*zphase
-      endif
+      zH(i,j) = zH(i,j)+fTB(TBFunction,Coords(i,:),Coords(j,:),i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*zphase
 
       do icount=2,numNeighborCells
         n1=nUnitCell_1(icount)
         n2=nUnitCell_2(icount)
               
         zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
-        if(TBKaxiras.eq.1)then
-          zH(i,j)=zH(i,j)+ftKaxiras(Coords(i,:), [Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)],i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*exp(-zi_vk_tn)*zphase
-        else
-          zH(i,j)=zH(i,j)+ft(Coords(i,:), [Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)])*exp(-zi_vk_tn)*zphase
-        endif
+        zH(i,j)=zH(i,j)+fTB(TBFunction,Coords(i,:), [Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)],i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*exp(-zi_vk_tn)*zphase
         
         zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
-        if(TBKaxiras.eq.1)then
-          zH(i,j)=zH(i,j)+ftKaxiras(Coords(i,:), [Coords(j,1:2)+n1*tn(:,1)+n2*tn(:,2),Coords(j,3)],i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*exp(-zi_vk_tn)*zphase
-        else
-          zH(i,j)=zH(i,j)+ft(Coords(i,:), [Coords(j,1:2)+n1*tn(:,1)+n2*tn(:,2),Coords(j,3)])*exp(-zi_vk_tn)*zphase
-        endif
+        zH(i,j)=zH(i,j)+fTB(TBFunction,Coords(i,:), [Coords(j,1:2)+n1*tn(:,1)+n2*tn(:,2),Coords(j,3)],i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*exp(-zi_vk_tn)*zphase
 
   
       enddo
@@ -1059,25 +1047,14 @@ subroutine GetKineticEnergy(fsum,Coords,zFock,Delta,nUnitCell_1,nUnitCell_2,ndim
    
      icount=1
       
-     if(TBKaxiras.eq.1)then
-        zsum=zsum+ftKaxiras(Coords(i,:),Coords(j,:),i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*zFock(i,j,1)
-     else
-        zsum=zsum+ft(Coords(i,:),Coords(j,:))*zFock(i,j,1)
-     endif
+     zsum=zsum+fTB(TBFunction,Coords(i,:),Coords(j,:),i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*zFock(i,j,1)
 
       do icount=2,numNeighborCells
         n1=nUnitCell_1(icount)
         n2=nUnitCell_2(icount)
         
-      if(TBKaxiras.eq.1)then
-        zsum=zsum+ftKaxiras(Coords(i,:), [Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)],i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*zFock(i,j,icount)
-        zsum=zsum+ftKaxiras(Coords(i,:), [Coords(j,1:2)+n1*tn(:,1)+n2*tn(:,2),Coords(j,3)],i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*conjg(zFock(j,i,icount))
-
-      else
-        zsum=zsum+ft(Coords(i,:), [Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)])*zFock(i,j,icount)
-        zsum=zsum+ft(Coords(i,:), [Coords(j,1:2)+n1*tn(:,1)+n2*tn(:,2),Coords(j,3)])*conjg(zFock(j,i,icount))
-
-      endif
+      zsum=zsum+fTB(TBFunction,Coords(i,:), [Coords(j,1:2)-n1*tn(:,1)-n2*tn(:,2),Coords(j,3)],i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*zFock(i,j,icount)
+      zsum=zsum+fTB(TBFunction,Coords(i,:), [Coords(j,1:2)+n1*tn(:,1)+n2*tn(:,2),Coords(j,3)],i,j,NearestNeighborsUC,NearestNeighborsT,Coords,tm)*conjg(zFock(j,i,icount))
 
       enddo
 

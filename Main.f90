@@ -186,7 +186,6 @@ call InitParameters()
 
 write(*,*) 'parameters',parameters
 
-
 if(nRead.EQ.1)then
     
     write(*,*) 'parametersIn',parametersIn
@@ -464,10 +463,10 @@ do while(it.LT.itmax)
 
     else
 
-        nWindowSort_2Spins(1,1) = NeutralityPoint - 1
-        nWindowSort_2Spins(2,1) = NeutralityPoint + 2 +1
-        nWindowSort_2Spins(1,2) = NeutralityPoint - 1
-        nWindowSort_2Spins(2,2) = NeutralityPoint + 2 +1
+        nWindowSort_2Spins(1,1) = 1
+        nWindowSort_2Spins(2,1) = numb +1
+        nWindowSort_2Spins(1,2) = 1
+        nWindowSort_2Spins(2,2) = numb +1
 
         call SortEnergies_2Spins(numk,numb,nWindowSort_2Spins,SortedEnergies_1Spin,SortedEnergies_2Spins)
         

@@ -174,7 +174,7 @@ call LongRangeInteraction(LongRange, Coords, ndim, t1, t2)
 
 call InitParameters()
 
-write(*,*) 'parameters',   parameters
+write(*,*) 'parameters',   parametersIn
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!  Read Fock matrix
@@ -184,9 +184,9 @@ write(*,*) 'parameters',   parameters
     do nspin=1,numS
         write(*,*) 'reading Fock...'
         if(numS.eq.1_dp)then
-            write(filename,'(A9,A10,I0,A210)') dirFock,'Fock-nspin',1,parameters
+            write(filename,'(A9,A10,I0,A210)') dirFock,'Fock-nspin',1,parametersIn
         else
-            write(filename,'(A9,A10,I0,A210)') dirFock,'Fock-nspin',nspin,parameters
+            write(filename,'(A9,A10,I0,A210)') dirFock,'Fock-nspin',nspin,parametersIn
         endif
         open(12, file=filename, form='unformatted', status='old', access='direct', recl=dp*2)
         rcc=0
@@ -379,7 +379,7 @@ enddo
 do nspin=1,numS
 
     call InterSubInterValAlt(fKA_conjxfKpB,fKB_conjxfKpA,KekuleLattice,KekuleNeighbors,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,TnTonUnitCell12,zFock(:,:,:,nspin))
-    write(filename,'(A7,A29,I0,A210)') dir,'InterSubInterVal-numb20-nspin',nspin,parameters
+    write(filename,'(A7,A21,I0,A6,I0,A210)') dir,'InterSubInterVal-numb',numb,'-nspin',nspin,parametersIn
     open(98,file=filename,status='replace')
     do i=1,ndim/2
         write(98,'(4(ES12.5,3X))') real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i)), real(fKB_conjxfKpA(i)), aimag(fKB_conjxfKpA(i))
@@ -387,7 +387,7 @@ do nspin=1,numS
     close(98)
 
     call IntraSubInterValAlt(fKp_conjxfK,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,NearestNeighborsUC,NearestNeighborsT,TnTonUnitCell12,zFock(:,:,:,nspin))
-    write(filename,'(A7,A29,I0,A210)') dir,'IntraSubInterVal-numb20-nspin',nspin,parameters
+    write(filename,'(A7,A21,I0,A6,I0,A210)') dir,'IntraSubInterVal-numb',numb,'-nspin',nspin,parametersIn
     open(98,file=filename,status='replace')
     do i=1,ndim
         write(98,'(2(ES12.5,3X))') real(fKp_conjxfK(i)), aimag(fKp_conjxfK(i))
@@ -395,7 +395,7 @@ do nspin=1,numS
     close(98)
 
     call InterSubIntraValAlt(fKA_conjxfKpB,fKB_conjxfKpA,KekuleLattice,KekuleNeighbors,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,TnTonUnitCell12,zFock(:,:,:,nspin))
-    write(filename,'(A7,A29,I0,A210)') dir,'InterSubIntraVal-numb20-nspin',nspin,parameters
+    write(filename,'(A7,A21,I0,A6,I0,A210)') dir,'InterSubIntraVal-numb',numb,'-nspin',nspin,parametersIn
     open(98,file=filename,status='replace')
     do i=1,ndim/2
         write(98,'(2(ES12.5,3X))') real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i))
@@ -406,7 +406,7 @@ do nspin=1,numS
     close(98)
 
     call IntraSubIntraValAlt(ValleyPol,NormSquared,ndim,NearestNeighborsUC,NearestNeighborsT,numNeighborCells,nUnitCell_1,nUnitCell_2,TnTonUnitCell12,zFock(:,:,:,nspin))
-    write(filename,'(A7,A29,I0,A210)') dir,'IntraSubIntraVal-numb20-nspin',nspin,parameters
+    write(filename,'(A7,A21,I0,A6,I0,A210)') dir,'IntraSubIntraVal-numb',numb,'-nspin',nspin,parametersIn
     open(98,file=filename,status='replace')
     do i=1,ndim
         write(98,'(2(ES12.5,3X))') ValleyPol(i), NormSquared(i)
@@ -416,11 +416,11 @@ do nspin=1,numS
 enddo
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!  Expand to 8 bands and build background
+!!  Background to subtract
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 do nspin=1,numS
-    do nband=1,8
+    do nband=1,numb/2-2
         do icount=1,Nk
             zSortedEigenvectors(:,(nband-1)*Nk+icount,nspin) = zEigenvectors(:,nband,icount,nspin)
             nSortedMomenta((nband-1)*Nk+icount,1,nspin) = nMomentaComponents(icount,1)
@@ -435,11 +435,11 @@ do nspin=1,numS
     zFock(:,:,:,nspin) = cmplx(0.0_dp,0.0_dp,dp)
     if(nenforceC3.eq.1)then
         call GetFock_C3(zFock(:,:,:,nspin),zSortedEigenvectors(:,:,nspin),ndim,RotateLayers,numb,numk,&
-        0.0_dp,8_dp*Nk,0_dp,Coords,MomentaValues,numNeighborCells,&
+        0.0_dp,(numb/2-2)*Nk,0_dp,Coords,MomentaValues,numNeighborCells,&
         nUnitCell_1,nUnitCell_2,nSortedMomenta(:,:,nspin),nC3pairs)
     else
         call GetFock(zFock(:,:,:,nspin),zSortedEigenvectors(:,:,nspin),ndim,numb,numk,&
-        0.0_dp,8_dp*Nk,0_dp,Coords,MomentaValues,numNeighborCells,&
+        0.0_dp,(numb/2-2)*Nk,0_dp,Coords,MomentaValues,numNeighborCells,&
         nUnitCell_1,nUnitCell_2,nSortedMomenta(:,:,nspin))
     endif
 
@@ -453,7 +453,7 @@ enddo
 do nspin=1,numS
 
     call InterSubInterValAlt(fKA_conjxfKpB,fKB_conjxfKpA,KekuleLattice,KekuleNeighbors,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,TnTonUnitCell12,zFock(:,:,:,nspin))
-    write(filename,'(A7,A28,I0,A210)') dir,'InterSubInterVal-numb4-nspin',nspin,parameters
+    write(filename,'(A7,A28,I0,A210)') dir,'InterSubInterVal-numb4-nspin',nspin,parametersIn
     open(98,file=filename,status='replace')
     do i=1,ndim/2
         write(98,'(4(ES12.5,3X))') real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i)), real(fKB_conjxfKpA(i)), aimag(fKB_conjxfKpA(i))
@@ -461,7 +461,7 @@ do nspin=1,numS
     close(98)
 
     call IntraSubInterValAlt(fKp_conjxfK,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,NearestNeighborsUC,NearestNeighborsT,TnTonUnitCell12,zFock(:,:,:,nspin))
-    write(filename,'(A7,A28,I0,A210)') dir,'IntraSubInterVal-numb4-nspin',nspin,parameters
+    write(filename,'(A7,A28,I0,A210)') dir,'IntraSubInterVal-numb4-nspin',nspin,parametersIn
     open(98,file=filename,status='replace')
     do i=1,ndim
         write(98,'(2(ES12.5,3X))') real(fKp_conjxfK(i)), aimag(fKp_conjxfK(i))
@@ -469,7 +469,7 @@ do nspin=1,numS
     close(98)
 
     call InterSubIntraValAlt(fKA_conjxfKpB,fKB_conjxfKpA,KekuleLattice,KekuleNeighbors,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,TnTonUnitCell12,zFock(:,:,:,nspin))
-    write(filename,'(A7,A28,I0,A210)') dir,'InterSubIntraVal-numb4-nspin',nspin,parameters
+    write(filename,'(A7,A28,I0,A210)') dir,'InterSubIntraVal-numb4-nspin',nspin,parametersIn
     open(98,file=filename,status='replace')
     do i=1,ndim/2
         write(98,'(2(ES12.5,3X))') real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i))
@@ -480,7 +480,7 @@ do nspin=1,numS
     close(98)
 
     call IntraSubIntraValAlt(ValleyPol,NormSquared,ndim,NearestNeighborsUC,NearestNeighborsT,numNeighborCells,nUnitCell_1,nUnitCell_2,TnTonUnitCell12,zFock(:,:,:,nspin))
-    write(filename,'(A7,A28,I0,A210)') dir,'IntraSubIntraVal-numb4-nspin',nspin,parameters
+    write(filename,'(A7,A28,I0,A210)') dir,'IntraSubIntraVal-numb4-nspin',nspin,parametersIn
     open(98,file=filename,status='replace')
     do i=1,ndim
         write(98,'(2(ES12.5,3X))') ValleyPol(i), NormSquared(i)

@@ -3,38 +3,56 @@ module Setup
 
 implicit none
 
+! "model" parameters
 integer, parameter :: dp = 8                                                               ! dp=4/8: single/double precision
 integer(dp), parameter :: nlayers = 2                                                      ! number of layers
-integer(dp), parameter :: ntheta = 37                                                      ! twist angle = acos(1 - 1/(6ntheta^2 + 6ntheta + 2))
+integer(dp), parameter :: ntheta = 9                                                      ! twist angle = acos(1 - 1/(6ntheta^2 + 6ntheta + 2))
 integer(dp), parameter :: RotateLayers(nlayers) = [-1,+1]                                  ! Positive/negative rotation of layers 
 integer(dp), parameter :: ndim = nlayers*2*(ntheta**2+(ntheta+1)**2+(ntheta+1)*ntheta)     ! number of atoms in unt cell
 integer(dp), parameter :: numk = 6                      ! number of grid points in the BZ  Nk = numk * numk
-integer(dp), parameter :: TBKaxiras = 1                  ! Choose tight-binding model 
-integer(dp), parameter :: nrelax = 2                     ! 0/1: unrelaxed/relaxed lattice  
-integer(dp), parameter :: numS = 1                       ! numS=1: spin singlet, numS=2: independent up/down spins 
-real(dp), parameter :: nfilling = 0.0_dp                 ! filling in units of e/unit cell. -4/+4:empty/full flat bands, 0:charge neutrality
-character(3) :: statename = 'KIV'                        ! label for the solution
-real(dp), parameter :: U = 4.00_dp                       ! Hubbard U in eV
-real(dp), parameter :: epsilon = 10.0_dp                   ! dielectric constant
-real(dp), parameter :: Delta = 0.000_dp                 ! layer bias in eV
-integer(dp), parameter :: numI = 1                      ! number of outer unit cell shells when computing the exchange term
-integer(dp), parameter :: numC = 10                      ! number of outer unit cell shells when computing the Hartree term    
-integer(dp), parameter :: nscreen = 2                       ! 1/2: single/double metallic gate screening
-real(dp), parameter:: xi = 10.0_dp/0.246_dp              ! distance to metallic gates= xi/2, in units of a=2.46 A
-integer(dp), parameter :: numb = 5*4                  !minval([20_dp,ndim])   ! number of bands of the outputs/FockBulk computation/Fermi energy sorting 
-integer(dp), parameter :: ncb = numb/2                  ! number of bands above charge neutrality in the outputs (numb-nvb below CN)
-integer(dp), parameter :: fphase = 0                    ! 0/1: phase included/not included in the definition of the Bloch states
+integer(dp), parameter :: TBFunction = 1                 ! 1/2: Slater-Koster/Wannier tight-binding function (Wannier only for bilayer)
+integer(dp), parameter :: nrelax = 0                     ! 0/1/2: unrelaxed/relaxed lattice Nam etal/relaxed lattice Carr et al (1/2 only for bilayer) 
 
+! "solution" parameters
+real(dp), parameter :: nfilling = 0.0_dp                 ! filling in units of e/unit cell. -4/+4:empty/full flat bands, 0:charge neutrality
+integer(dp), parameter :: numS = 1                       ! numS=1: spin singlet, numS=2: independent up/down spins 
+character(3) :: statename = 'KIV'                        ! label for the solution
 integer(dp), parameter:: nenforceC3 = 1                   ! enforce C_3z symmetry
 integer(dp), parameter:: nenforceC2 = 0                   ! enforce C_2z symmetry
 integer(dp), parameter:: nenforceT = 0                    ! enforce time-reversal (T) symmetry
 integer(dp), parameter:: nenforceC2T = 1                  ! enforce C_2zT symmetry
 integer(dp), parameter:: nenforceValley = 0               ! enforce U(1)_valley symmetry
 
+! "interaction" parameters
+real(dp), parameter :: epsilon = 10.0_dp                   ! dielectric constant
+real(dp), parameter :: U = 4.00_dp                       ! Hubbard U in eV
+real(dp), parameter :: Delta = 0.000_dp                 ! layer bias in eV
+integer(dp), parameter :: numI = 1                      ! number of outer unit cell shells when computing the exchange term
+integer(dp), parameter :: numC = 10                      ! number of outer unit cell shells when computing the Hartree term    
+integer(dp), parameter :: nscreen = 2                       ! 1/2: single/double metallic gate screening
+real(dp), parameter:: xi = 2.0_dp/0.246_dp              ! distance to metallic gates= xi/2, in units of a=2.46 A
+
+! "loop parameters"
+real(dp), parameter :: EnergyTolerance=0.0001_dp         ! energies within tolerance are considered degenerate when computing the Fock matrix  
+real(dp), parameter :: StepAlternative = 1.0_dp          ! value of step when the ODA algo does not provide it (the energy increases for any value)
+integer(dp), parameter :: itmax = 100                      ! maximal number of iterations of the self-consistency loop  
+
+! "diagonalization" parameters
+integer(dp), parameter :: numb = 5*4                  !minval([20_dp,ndim])   ! number of bands of the outputs/FockBulk computation/Fermi energy sorting 
+integer(dp), parameter :: ncb = numb/2                  ! number of bands above charge neutrality in the outputs (numb-nvb below CN)
+integer(dp), parameter :: fphase = 0                    ! 0/1: phase included/not included in the definition of the Bloch states
+integer(dp), parameter :: nLower=(ndim - 2*numb + 2*ncb)/2+1    ! Lowest band in outputs/FockBulk computation
+integer(dp), parameter :: nUpper=(ndim + 2*ncb)/2               ! Highest band in outputs/FockBulk computation
+integer(dp), parameter :: NeutralityPoint=(ndim/2 - nLower)+1   ! Band index  neutrality point
+
+! "output" parameters
 integer(dp), parameter :: nPrintOutputs = 1              ! 0/1: do not print/print outputs
 integer(dp), parameter :: nWriteFock = 1                 ! 0/1: do not write/write Fock matrix as an output
+character(9) :: dirFock  = 'dataFock/'                                ! folder to output Fock matrix
+character(7) :: dir = 'output/'                                       ! folder for all other outputs
 
-integer(dp), parameter :: nRead = 1                    ! 0/1: compute/read inital guess for the state 
+! "read" parameters
+integer(dp), parameter :: nRead = 0                    ! 0/1: compute/read inital guess for the state 
 integer(dp), parameter :: dpIn = 4                       ! precision of initial guess if nRead=1
 integer(dp), parameter :: numkIn = 6                       ! numk of initial guess
 integer(dp), parameter :: nrelaxIn = 2                     ! nrelax of initial guess
@@ -45,7 +63,6 @@ real(dp), parameter :: UIn = 4.00_dp                       ! Hubbard U in eV of 
 real(dp), parameter :: epsilonIn = 10.00_dp                    ! dielectric constant of initial guess
 real(dp), parameter :: DeltaIn = 0.000_dp                 ! layer bias in eV of initial guess
 integer(dp), parameter :: numIIn = 1                      ! numI of initial guess
-integer(dp), parameter :: numCIn = 10                      ! numc of initial guess
 integer(dp), parameter :: nscreenIn = 2                       ! scr of initial guess
 real(dp), parameter:: xiIn = 10.0_dp/0.246_dp              ! xi of initial guess
 integer(dp), parameter:: nenforceC3In = 1                  ! nenforceC3 of initial guess
@@ -54,62 +71,67 @@ integer(dp), parameter:: nenforceTIn = 0                   ! nenforceT of initia
 integer(dp), parameter:: nenforceC2TIn = 1                 ! nenforceC2T of initial guess
 integer(dp), parameter:: nenforceValleyIn = 0              ! nenforceValley of initial guess
 
-
-real(dp), parameter :: EnergyTolerance=0.0001_dp         ! energies within tolerance are considered degenerate when computing the Fock matrix  
-real(dp), parameter :: StepAlternative = 1.0_dp          ! value of step when the ODA algo does not provide it (the energy increases for any value)
-integer(dp), parameter :: itmax = 100                      ! maximal number of iterations of the self-consistency loop  
-
-character(9) :: dirFock  = 'dataFock/'                                ! folder to output Fock matrix
-character(7) :: dir = 'output/'                                       ! folder for all other outputs
-
+! various numerical values
 real(dp), parameter :: alpha = 5.853_dp/epsilon*1.0_dp                  ! e^2/(4pi x epsilon0 x epsilon) in units of eV x a    
 real(dp), parameter :: alphaH = 5.853_dp/epsilon*1.0_dp                 ! alpha/alphaH is used in the exchange/Hartree term
-
-real(dp), parameter :: pressure=1.0_dp                 ! parameter that mimics hydrostatic pressure. 1.0=no external pressure
+real(dp), parameter :: pressure=1.134_dp                 ! parameter that mimics hydrostatic pressure. 1.0=no external pressure
 real(dp), parameter :: tz = 1.35772_dp/pressure        ! layer separation in units of a
-
 real(dp), parameter :: a0 = 1.0_dp/sqrt(3.0_dp)        ! carbon-carbon distance in units of a
-real(dp), parameter :: r0 = 0.184_dp                   ! tight-binding decay constant
-real(dp), parameter :: d0 = 1.35772_dp/pressure        ! tight-binding decay constant
-
-real(dp), parameter :: tparallel0 = -18.4295_dp        ! carbon-carbon distance in units of a
-real(dp), parameter :: al0 = 1.2771_dp                   ! tight-binding decay constant
-real(dp), parameter :: bet0 = 2.3934_dp        ! tight-binding decay constant
-real(dp), parameter :: tparallel1 = -3.7183_dp        ! carbon-carbon distance in units of a
-real(dp), parameter :: al1 = 6.2194_dp 
-real(dp), parameter :: y1 = 0.9071_dp  
-
-real(dp), parameter :: lambda0 = 0.3155_dp        
-real(dp), parameter :: lambda3 = -1*0.0688_dp                   
-real(dp), parameter :: lambda6 = -1*0.0083_dp        
-real(dp), parameter :: xi0 = 1.7543_dp      
-real(dp), parameter :: xi3 = 3.4692_dp      
-real(dp), parameter :: xi6 = 2.8764_dp         
-real(dp), parameter :: y3 = 0.5212_dp                   
-real(dp), parameter :: y6 = 1.5206_dp                   
-real(dp), parameter :: kappa0 = 2.0010_dp      
-real(dp), parameter :: kappa6 = 1.5731_dp 
-
-integer(dp), parameter :: nLower=(ndim - 2*numb + 2*ncb)/2+1    ! Lowest band in outputs/FockBulk computation
-integer(dp), parameter :: nUpper=(ndim + 2*ncb)/2               ! Highest band in outputs/FockBulk computation
-integer(dp), parameter :: NeutralityPoint=(ndim/2 - nLower)+1   ! Band index  neutrality point
-
 real(dp), parameter :: a1(2) = [ 0.5_dp,sqrt(3.0_dp)*0.5_dp]       ! graphene lattice vectors
 real(dp), parameter :: a2(2) = [-0.5_dp,sqrt(3.0_dp)*0.5_dp]       ! graphene lattice vectors
-
 real(dp), parameter :: pi = 4.0_dp*atan(1.0_dp)        ! pi=3.141592
 
+! Filename suffixes (built at runtime by InitParameters)
+character(210) :: parameters                             ! parameters of the run
+character(210) :: parametersIn                           ! parameters of the initial guess
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!! Filename suffixes built at runtime by InitParameters (not constants: they format reals/ints)
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-character(210) :: parameters                             ! suffix encoding the parameters of the run
-character(210) :: parametersIn                           ! suffix encoding the parameters of the initial guess
-
-private :: rstr, istr, cstr, AssignSuffix             ! helpers used only to build the suffixes
+private :: rstr, istr, cstr, AssignSuffix             ! helpers used to build the suffixes
 
 contains
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! Builds 'parameters' and 'parametersIn'
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+subroutine InitParameters()
+
+character(:), allocatable :: s
+
+s = '-'//trim(statename)//'-numS'//istr(numS)//cstr(nenforceC3,nenforceC2,nenforceT,nenforceC2T,nenforceValley)// &
+    '-filling'//rstr(nfilling,1,plus=.true.)// &
+    '-i'//istr(ntheta)// &
+    '-nlayers'//istr(nlayers)// &
+    '-TB'//istr(TBFunction)// &
+    '-relax'//istr(nrelax)// &
+    '-delta'//rstr(Delta*1000.0_dp,1)// &                ! tagged in meV, Delta is in eV
+    '-eps'//rstr(epsilon,1)// &
+    '-U'//rstr(U,2)// &
+    '-screen'//istr(nscreen)// &
+    '-xi'//rstr(xi*0.246_dp,1)// &
+    '-numI'//istr(numI)// &
+    '-numk'//istr(numk)// &
+    '-dp'//istr(int(dp,dp))//'.dat'                      ! dp is a default integer, unlike the rest
+
+call AssignSuffix(parameters,s,'parameters')
+
+s = '-'//trim(statenameIn)//'-numS'//istr(numSIn)//cstr(nenforceC3In,nenforceC2In,nenforceTIn,nenforceC2TIn,nenforceValleyIn)// &
+    '-filling'//rstr(nfillingIn,1,plus=.true.)// &
+    '-i'//istr(ntheta)// &
+    '-nlayers'//istr(nlayers)// &
+    '-TB'//istr(TBFunction)// &
+    '-relax'//istr(nrelaxIn)// &
+    '-delta'//rstr(DeltaIn*1000.0_dp,1)// &
+    '-eps'//rstr(epsilonIn,1)// &
+    '-U'//rstr(UIn,2)// &
+    '-screen'//istr(nscreenIn)// &
+    '-xi'//rstr(xiIn*0.246_dp,1)// &
+    '-numI'//istr(numIIn)// &
+    '-numk'//istr(numkIn)// &
+    '-dp'//istr(dpIn)//'.dat'
+
+call AssignSuffix(parametersIn,s,'parametersIn')
+
+end subroutine InitParameters
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !! real -> shortest string with nd decimals. A wide Fw.d field keeps the leading zero ('0.0',
@@ -175,7 +197,7 @@ if(nC2+nT+nC2T.EQ.2_dp)then                              ! any two of C2, T, C2T
     nC2T = 1_dp
 endif
 
-s = '-constrain'//istr(mC3)//istr(nC2)//istr(nT)//istr(nC2T)//istr(mValley)
+s = '-SymConstrain'//istr(mC3)//istr(nC2)//istr(nT)//istr(nC2T)//istr(mValley)
 
 end function cstr
 
@@ -197,48 +219,5 @@ endif
 suffix = s
 
 end subroutine AssignSuffix
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!! Builds 'parameters' and 'parametersIn'. Must be called as the first executable statement of
-!! every program that uses Setup, before any filename is written.
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-subroutine InitParameters()
-
-character(:), allocatable :: s
-
-s = '-'//trim(statename)//'-numS'//istr(numS)//cstr(nenforceC3,nenforceC2,nenforceT,nenforceC2T,nenforceValley)// &
-    '-filling'//rstr(nfilling,1,plus=.true.)// &
-    '-i'//istr(ntheta)// &
-    '-nlayers'//istr(nlayers)// &
-    '-relax'//istr(nrelax)// &
-    '-eps'//rstr(epsilon,1)// &
-    '-U'//rstr(U,2)// &
-    '-screen'//istr(nscreen)// &
-    '-xi'//rstr(xi*0.246_dp,1)// &
-    '-delta'//rstr(Delta*1000.0_dp,1)// &                ! tagged in meV, Delta is in eV
-    '-numI'//istr(numI)// &
-    '-numk'//istr(numk)// &
-    '-dp'//istr(int(dp,dp))//'.dat'                      ! dp is a default integer, unlike the rest
-
-call AssignSuffix(parameters,s,'parameters')
-
-s = '-'//trim(statenameIn)//'-numS'//istr(numSIn)//cstr(nenforceC3In,nenforceC2In,nenforceTIn,nenforceC2TIn,nenforceValleyIn)// &
-    '-filling'//rstr(nfillingIn,1,plus=.true.)// &
-    '-i'//istr(ntheta)// &
-    '-nlayers'//istr(nlayers)// &
-    '-relax'//istr(nrelaxIn)// &
-    '-eps'//rstr(epsilonIn,1)// &
-    '-U'//rstr(UIn,2)// &
-    '-screen'//istr(nscreenIn)// &
-    '-xi'//rstr(xiIn*0.246_dp,1)// &
-    '-delta'//rstr(DeltaIn*1000.0_dp,1)// &
-    '-numI'//istr(numIIn)// &
-    '-numk'//istr(numkIn)// &
-    '-dp'//istr(dpIn)//'.dat'
-
-call AssignSuffix(parametersIn,s,'parametersIn')
-
-end subroutine InitParameters
 
 end module Setup
