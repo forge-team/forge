@@ -13,10 +13,12 @@ use TightBinding
 use HartreeFock
 use OrderPlot
 use lapack_routines
+use PostProcessingInput, only: BuildGeometry, InputParameters, ReadFock
 
 implicit none
 
 character(300) :: filename
+character(210) :: inputSuffix
 character(150) :: my_iomsg
 
 integer(dp) :: Nk, icount, n, m, i, j, nspin, numNeighborCells, nband
@@ -27,11 +29,10 @@ real(dp) :: vk(2)
 real(dp), allocatable :: Energies(:)
 complex(dp), allocatable :: zH(:,:)
 
-real(dp) :: aMoire, cs, sn, FermiEnergy, DegFactor
+real(dp) :: FermiEnergy, DegFactor
 real(dp) :: t1(2), t2(2), t3(2), tn(6,2), g1(2), g12(2), RotMatrix(2,2)
 integer(dp) :: TnTonUnitCell12(0:6,2)
 
-complex(dp) :: zinput
 
 integer(dp), allocatable :: nMomentaComponents(:,:), nMomentaFlattened(:,:)
 integer(dp), allocatable :: nSortedMomenta(:,:,:)
@@ -108,44 +109,8 @@ allocate(zH(ndim,ndim))
 
 call OrderNeighborCells(numI, numNeighborCells, nUnitCell_1, nUnitCell_2)
 
-aMoire = 3.0_dp*ntheta**2 + 3.0_dp*ntheta + 1.0_dp
-g1  = (4.0_dp*pi/3.0_dp)/aMoire*(real(3*ntheta+1,dp)*a1+a2)
-g12 = (4.0_dp*pi/3.0_dp)/aMoire*(real(3*ntheta+2,dp)*a2-a1)
-
-cs = 1.0_dp-1.0_dp/(2.0_dp*aMoire)
-sn = sqrt(1.0_dp-cs**2)
-RotMatrix = reshape([cos(0.5_dp*acos(cs)),-sin(0.5_dp*acos(cs)),&
-                     sin(0.5_dp*acos(cs)), cos(0.5_dp*acos(cs))],[2,2])
-
-g1  = matmul(RotMatrix, g1)
-g12 = matmul(RotMatrix, g12)
-
-call SampleBZ(nMomentaComponents, nMomentaFlattened, MomentaValues, numk, g1, g12)
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!  Geometry: real space
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-t1 = real( ntheta  ,dp)*a1 + real(  ntheta+1,dp)*a2
-t2 = real(-ntheta-1,dp)*a1 + real(2*ntheta+1,dp)*a2
-t3 = t2-t1
-
-call WignerSeitzCell(Coords, t1, t2, cs, sn)
-
-do n=1,ndim
-    Coords(n,:) = matmul(RotMatrix, Coords(n,1:2))
-end do
-
-t1 = matmul(RotMatrix, t1)
-t2 = matmul(RotMatrix, t2)
-t3 = t2-t1
-
-if(nrelax.EQ.1)then
-    if(nlayers.EQ.2) call LatticeRelaxationKoshino(Coords, g1, g12)
-endif
-if(nrelax.EQ.2)then
-    if(nlayers.EQ.2) call LatticeRelaxationCarr(Coords, g1, g12)
-endif
+call BuildGeometry(Coords,t1,t2,t3,g1,g12,RotMatrix)
+call SampleBZ(nMomentaComponents,nMomentaFlattened,MomentaValues,numk,g1,g12)
 
 call C2_RelatedPoints(nC2pairs, Coords, ndim)
 call C3_RelatedPoints(nC3pairs, Coords, ndim)
@@ -172,46 +137,9 @@ call LongRangeInteraction(LongRange, Coords, ndim, t1, t2)
 !!  File name strings
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-call InitParameters()
-
-write(*,*) 'parameters',   parametersIn
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!  Read Fock matrix
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-    do nspin=1,numS
-        write(*,*) 'reading Fock...'
-        if(numS.eq.1_dp)then
-            write(filename,'(A9,A10,I0,A210)') dirFock,'Fock-nspin',1,parametersIn
-        else
-            write(filename,'(A9,A10,I0,A210)') dirFock,'Fock-nspin',nspin,parametersIn
-        endif
-        open(12, file=filename, form='unformatted', status='old', access='direct', recl=dp*2)
-        rcc=0
-        do i=1,ndim
-            do j=1,i-1
-                rcc = rcc+1
-                read(12,rec=rcc) zinput
-                zFock(i,j,1,nspin) = zinput
-                zFock(j,i,1,nspin) = conjg(zinput)
-            enddo
-            rcc = rcc+1
-            read(12,rec=rcc) zinput
-            zFock(i,i,1,nspin) = zinput
-        enddo
-        do m=2,numNeighborCells
-            do i=1,ndim
-                do j=1,ndim
-                    rcc = rcc+1
-                    read(12,rec=rcc) zinput
-                    zFock(i,j,m,nspin) = zinput
-                enddo
-            enddo
-        enddo
-        close(12)
-    enddo
+call InputParameters(inputSuffix)
+write(*,*) 'parameters', trim(inputSuffix)
+call ReadFock(zFock,numNeighborCells,inputSuffix)
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!  Density and Potential
@@ -260,13 +188,13 @@ do nspin=1,numS
         ivk1=nMomentaComponents(icount,1)
         ivk2=nMomentaComponents(icount,2)
         vk(:)=MomentaValues(ivk1+1,ivk2+1,:)
-        
+
         call HamiltonianHartreeFock(zH,Coords,Potential(:,nspin),alpha,Delta,zFock(:,:,:,nspin),&
             nUnitCell_1,nUnitCell_2,ndim,numNeighborCells,vk,reshape([t1,t2,t3],[2,3]),&
             NearestNeighborsUC,NearestNeighborsT)
-        
+
         call diagonalize(zH,Energies,'V',nLower,nUpper)
-        
+
         do nband=1,nUpper-nLower+1
             Bands(nband,icount,nspin)=Energies(nband)
         enddo
@@ -318,7 +246,7 @@ if(numS.EQ.1)then
         nWindowSort_2Spins(2,2) = NeutralityPoint + 2 +1
 
         call SortEnergies_2Spins(numk,numb,nWindowSort_2Spins,SortedEnergies_1Spin,SortedEnergies_2Spins)
-        
+
         nFermiLevel = numS*nint(real(numk*numk*NeutralityPoint,dp)+real(numk*numk,dp)/2.0_dp*nfilling)
         FermiEnergy = (SortedEnergies_2Spins(nFermiLevel,1)+SortedEnergies_2Spins(nFermiLevel+1,1))/2.
 
@@ -351,7 +279,7 @@ if(numS.EQ.1)then
         endif
 
         write(*,*) 'Sorted energies', 1, nOccStates(1), nPartOccStates(1), 2, nOccStates(2), nPartOccStates(2), DegFactor
-        
+
     endif
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -379,7 +307,7 @@ enddo
 do nspin=1,numS
 
     call InterSubInterValAlt(fKA_conjxfKpB,fKB_conjxfKpA,KekuleLattice,KekuleNeighbors,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,TnTonUnitCell12,zFock(:,:,:,nspin))
-    write(filename,'(A7,A21,I0,A6,I0,A210)') dir,'InterSubInterVal-numb',numb,'-nspin',nspin,parametersIn
+    write(filename,'(A7,A21,I0,A6,I0,A210)') dir,'InterSubInterVal-numb',numb,'-nspin',nspin,inputSuffix
     open(98,file=filename,status='replace')
     do i=1,ndim/2
         write(98,'(4(ES12.5,3X))') real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i)), real(fKB_conjxfKpA(i)), aimag(fKB_conjxfKpA(i))
@@ -387,7 +315,7 @@ do nspin=1,numS
     close(98)
 
     call IntraSubInterValAlt(fKp_conjxfK,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,NearestNeighborsUC,NearestNeighborsT,TnTonUnitCell12,zFock(:,:,:,nspin))
-    write(filename,'(A7,A21,I0,A6,I0,A210)') dir,'IntraSubInterVal-numb',numb,'-nspin',nspin,parametersIn
+    write(filename,'(A7,A21,I0,A6,I0,A210)') dir,'IntraSubInterVal-numb',numb,'-nspin',nspin,inputSuffix
     open(98,file=filename,status='replace')
     do i=1,ndim
         write(98,'(2(ES12.5,3X))') real(fKp_conjxfK(i)), aimag(fKp_conjxfK(i))
@@ -395,7 +323,7 @@ do nspin=1,numS
     close(98)
 
     call InterSubIntraValAlt(fKA_conjxfKpB,fKB_conjxfKpA,KekuleLattice,KekuleNeighbors,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,TnTonUnitCell12,zFock(:,:,:,nspin))
-    write(filename,'(A7,A21,I0,A6,I0,A210)') dir,'InterSubIntraVal-numb',numb,'-nspin',nspin,parametersIn
+    write(filename,'(A7,A21,I0,A6,I0,A210)') dir,'InterSubIntraVal-numb',numb,'-nspin',nspin,inputSuffix
     open(98,file=filename,status='replace')
     do i=1,ndim/2
         write(98,'(2(ES12.5,3X))') real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i))
@@ -406,7 +334,7 @@ do nspin=1,numS
     close(98)
 
     call IntraSubIntraValAlt(ValleyPol,NormSquared,ndim,NearestNeighborsUC,NearestNeighborsT,numNeighborCells,nUnitCell_1,nUnitCell_2,TnTonUnitCell12,zFock(:,:,:,nspin))
-    write(filename,'(A7,A21,I0,A6,I0,A210)') dir,'IntraSubIntraVal-numb',numb,'-nspin',nspin,parametersIn
+    write(filename,'(A7,A21,I0,A6,I0,A210)') dir,'IntraSubIntraVal-numb',numb,'-nspin',nspin,inputSuffix
     open(98,file=filename,status='replace')
     do i=1,ndim
         write(98,'(2(ES12.5,3X))') ValleyPol(i), NormSquared(i)
@@ -453,7 +381,7 @@ enddo
 do nspin=1,numS
 
     call InterSubInterValAlt(fKA_conjxfKpB,fKB_conjxfKpA,KekuleLattice,KekuleNeighbors,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,TnTonUnitCell12,zFock(:,:,:,nspin))
-    write(filename,'(A7,A28,I0,A210)') dir,'InterSubInterVal-numb4-nspin',nspin,parametersIn
+    write(filename,'(A7,A28,I0,A210)') dir,'InterSubInterVal-numb4-nspin',nspin,inputSuffix
     open(98,file=filename,status='replace')
     do i=1,ndim/2
         write(98,'(4(ES12.5,3X))') real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i)), real(fKB_conjxfKpA(i)), aimag(fKB_conjxfKpA(i))
@@ -461,7 +389,7 @@ do nspin=1,numS
     close(98)
 
     call IntraSubInterValAlt(fKp_conjxfK,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,NearestNeighborsUC,NearestNeighborsT,TnTonUnitCell12,zFock(:,:,:,nspin))
-    write(filename,'(A7,A28,I0,A210)') dir,'IntraSubInterVal-numb4-nspin',nspin,parametersIn
+    write(filename,'(A7,A28,I0,A210)') dir,'IntraSubInterVal-numb4-nspin',nspin,inputSuffix
     open(98,file=filename,status='replace')
     do i=1,ndim
         write(98,'(2(ES12.5,3X))') real(fKp_conjxfK(i)), aimag(fKp_conjxfK(i))
@@ -469,7 +397,7 @@ do nspin=1,numS
     close(98)
 
     call InterSubIntraValAlt(fKA_conjxfKpB,fKB_conjxfKpA,KekuleLattice,KekuleNeighbors,ndim,numNeighborCells,nUnitCell_1,nUnitCell_2,TnTonUnitCell12,zFock(:,:,:,nspin))
-    write(filename,'(A7,A28,I0,A210)') dir,'InterSubIntraVal-numb4-nspin',nspin,parametersIn
+    write(filename,'(A7,A28,I0,A210)') dir,'InterSubIntraVal-numb4-nspin',nspin,inputSuffix
     open(98,file=filename,status='replace')
     do i=1,ndim/2
         write(98,'(2(ES12.5,3X))') real(fKA_conjxfKpB(i)), aimag(fKA_conjxfKpB(i))
@@ -480,7 +408,7 @@ do nspin=1,numS
     close(98)
 
     call IntraSubIntraValAlt(ValleyPol,NormSquared,ndim,NearestNeighborsUC,NearestNeighborsT,numNeighborCells,nUnitCell_1,nUnitCell_2,TnTonUnitCell12,zFock(:,:,:,nspin))
-    write(filename,'(A7,A28,I0,A210)') dir,'IntraSubIntraVal-numb4-nspin',nspin,parametersIn
+    write(filename,'(A7,A28,I0,A210)') dir,'IntraSubIntraVal-numb4-nspin',nspin,inputSuffix
     open(98,file=filename,status='replace')
     do i=1,ndim
         write(98,'(2(ES12.5,3X))') ValleyPol(i), NormSquared(i)
