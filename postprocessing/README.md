@@ -26,6 +26,7 @@ spectral/Drude/local-DOS calculations have not been validated.
 | `utils/Main_BandStructure.f90` | `compute_plotBands.f90` |
 | `utils/Main_OrderParamsFull.f90` | `Main_OrderParamsFull.f90` |
 | `utils/Main_OrderParamsLowEn.f90` | `Main_OrderParamsLowEn.f90` |
+| New layer-resolved overlap driver | `compute_OrderParameterLayers.f90` |
 
 `postprocessing` describes these programs more precisely than `utils`.
 `Compute_*` names the observable calculation; `Main.f90` remains the
@@ -70,9 +71,26 @@ contributions using `OrderParameter.f90`. Their filenames are preserved.
 Both use `BuildGeometry` and `ReadFock` and select the producer's current
 `parameters`, rather than the restart-input settings. They write to `output/`.
 
+`compute_OrderParameterLayers` evaluates the raw six-term interlayer lattice
+overlaps in Eqs. (63)-(65) of `OrderParameterLayer.pdf`, for A and B centers and
+both layer directions. It writes one row per layer-1 center to
+`output/OrderParameterLayers-numb<ndim>-nspin<s><parameters>`. Since the note
+does not define the three delta vectors outside its unresolved figures, the
+driver uses the honeycomb convention implied by the site's `a1,a2` basis:
+`d1=(a1+a2)/3`, `d2=d1+a1`, `d3=d1+a2`. It pairs the two layer-center sets
+one-to-one by minimum displacement across periodic moire-cell images and uses
+the actual saved Fock-cell translations. The file contains the direct loop
+overlaps; it does not apply the note's later valley projection. Eqs. (27)-(52)
+and (67) contain bra/ket conjugation inconsistencies, so the projected `rho`
+values are omitted until those equations are corrected and re-derived. The new
+driver has been compile-checked, and `--check-geometry` verifies the center
+pairing, all loop-site lookups, and the required neighbor-cell translations
+without reading a Fock file.
+The numerical output still needs validation against a saved Fock state.
+
 ## Common initialization
 
-All eight Fock-consuming programs use the shared initialization routines.
+All nine Fock-consuming programs use the shared initialization routines.
 For example, the response drivers use:
 
 ```fortran
@@ -141,6 +159,8 @@ running, for example:
 ```sh
 mkdir -p output output4
 ./postprocessing/.build/compute_plotBands
+./postprocessing/.build/compute_OrderParameterLayers --check-geometry
+./postprocessing/.build/compute_OrderParameterLayers
 ./postprocessing/.build/Compute_SpectralOptimize
 ./postprocessing/.build/Compute_KramersKronig
 ./postprocessing/.build/compute_localDos
@@ -165,15 +185,20 @@ The tests compile separate small Setup copies under `.build/tests/` and
   dev, and the sum of layer/interlayer current operators to finite differences
   of the dev Hamiltonian. They cover both gate configurations, both Bloch-phase
   conventions, all three relaxation choices and zero/one/two neighbor shells.
+- The new layer-overlap driver's one-to-one periodic center matching, all loop
+  endpoint lookups, and required Fock-cell translations in `--check-geometry`
+  mode; this geometry-only check does not need a saved Fock file.
 
-All nine complete programs compile and link. The 17 interface checks, six
+All ten complete programs compile and link. The 17 interface checks, six
 Hamiltonian/current checks, seven local-DOS checks and eight moved-driver
-checks pass (38 checks total). The band driver matches full-BZ diagonalization
-on a small fine grid, for both spin counts and both path orientations. The
-order-parameter drivers have tested geometry/Fock prologues; their complete
-observable calculations have not been independently validated. The maximum
-Hamiltonian discrepancy was zero in these cases; the maximum current discrepancy
-was 1.2e-9 in code units with a finite-difference step of 1e-6. These are small
+checks pass (39 checks total, including the geometry-only check above). The
+band driver matches full-BZ diagonalization on a small fine grid, for both spin
+counts and both path orientations. The
+two legacy order-parameter drivers have tested geometry/Fock prologues; their
+complete observable calculations have not been independently validated. The
+new layer-overlap driver has not yet been run against saved Fock data. The
+maximum Hamiltonian discrepancy was zero in these cases; the maximum current
+discrepancy was 1.2e-9 in code units with a finite-difference step of 1e-6. These are small
 synthetic-state checks, not full self-consistent observable calculations.
 The local-DOS checks cover the complete driver, its missing dependencies,
 site-summed DOS, saved Mu, integrated maps and separate layer Fourier sums;
