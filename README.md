@@ -78,6 +78,29 @@ make clean
 ```
 
 
+
+## Postprocessing
+
+The observable drivers are in [`postprocessing/`](postprocessing/README.md),
+which replaces `utils/`. They share the solver's root `Setup.f90` and read
+its saved Fock matrices. `Main_BandStructure.f90` is now named
+`compute_plotBands.f90`. Spectral, Drude, Kramers–Kronig and local-DOS drivers
+are included alongside the two order-parameter drivers.
+
+With GNU Fortran and BLAS/LAPACK (Accelerate on macOS):
+
+```sh
+make -C postprocessing
+make -C postprocessing check
+mkdir -p output output4
+./postprocessing/.build/compute_plotBands
+```
+
+Run from the repository root, after generating the matching state in
+`dataFock/`. See the postprocessing README for compiler options, observable
+settings, input/output names and supported model restrictions.
+
+
 ## License
 
 This project is licensed under the terms of the MIT License.  
