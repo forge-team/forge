@@ -10,7 +10,7 @@ endif
 
 BUILD = .build
 PROGRAMS = Compute_Spectral Compute_SpectralFull Compute_SpectralOptimize Compute_DrudeFull Compute_KramersKronig compute_localDos
-UPSTREAM_PROGRAMS = compute_plotBands Main_OrderParamsFull Main_OrderParamsLowEn compute_OrderParameterLayers
+UPSTREAM_PROGRAMS = compute_plotBands Main_OrderParamsFull Main_OrderParamsLowEn compute_OrderParameterLayers compute_LayerOrderParameter
 COMMON = LapackRoutines.f90 ../Setup.f90 ../TightBinding.f90 ../Geometry.f90 ../HartreeFock.f90 Hamiltonian.f90 PostProcessingInput.f90
 OBJECTS = LapackRoutines.o Setup.o TightBinding.o Geometry.o HartreeFock.o Hamiltonian.o PostProcessingInput.o
 UPSTREAM_COMMON = ../LapackRoutines.f90 ../Setup.f90 ../TightBinding.f90 ../Geometry.f90 ../HartreeFock.f90 ../OrderParameter.f90 PostProcessingInput.f90
@@ -37,9 +37,13 @@ $(BUILD)/upstream/modules.stamp: $(UPSTREAM_COMMON) Makefile
 $(addprefix $(BUILD)/,$(UPSTREAM_PROGRAMS)): $(BUILD)/%: %.f90 $(BUILD)/upstream/modules.stamp
 	cd $(BUILD)/upstream && $(FC) $(FFLAGS) -o ../$* ../../$< $(UPSTREAM_OBJECTS) $(LIBS)
 
-check: $(BUILD)/compute_OrderParameterLayers
+check: $(BUILD)/compute_OrderParameterLayers $(BUILD)/compute_LayerOrderParameter
 	python3 tests/check_interfaces.py
 	python3 tests/check_screening.py
 	python3 tests/check_localdos.py
 	python3 tests/check_moved_drivers.py
+	python3 tests/check_layer_orderparameter.py
+	python3 tests/check_layer_geometry.py
+	python3 tests/check_equal_layer_orderparameter.py
 	./$(BUILD)/compute_OrderParameterLayers --check-geometry
+	./$(BUILD)/compute_LayerOrderParameter --check-geometry

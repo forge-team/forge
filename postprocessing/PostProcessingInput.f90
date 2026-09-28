@@ -10,8 +10,9 @@ module PostProcessingInput
     public :: BuildGeometry, ReadFock, InputParameters, ValidateResponseModel
 contains
 
-subroutine BuildGeometry(Coords, t1, t2, t3, g1, g12, RotMatrix)
+subroutine BuildGeometry(Coords, t1, t2, t3, g1, g12, RotMatrix, ReferenceCoords)
     real(dp), intent(out) :: Coords(ndim,3), t1(2), t2(2), t3(2), g1(2), g12(2), RotMatrix(2,2)
+    real(dp), intent(out), optional :: ReferenceCoords(ndim,3)
     real(dp) :: aMoire, cs, sn
     integer :: n
 
@@ -35,6 +36,10 @@ subroutine BuildGeometry(Coords, t1, t2, t3, g1, g12, RotMatrix)
     t1 = matmul(RotMatrix,t1)
     t2 = matmul(RotMatrix,t2)
     t3 = t2-t1
+
+    ! Preserve the ideal lattice labels for loop topology and Bloch phases.
+    ! Relaxation changes positions, but does not change the atom ordering.
+    if(present(ReferenceCoords)) ReferenceCoords = Coords
 
     if(nrelax == 1 .and. nlayers == 2) call LatticeRelaxationKoshino(Coords,g1,g12)
     if(nrelax == 2 .and. nlayers == 2) call LatticeRelaxationCarr(Coords,g1,g12)

@@ -26,7 +26,8 @@ spectral/Drude/local-DOS calculations have not been validated.
 | `utils/Main_BandStructure.f90` | `compute_plotBands.f90` |
 | `utils/Main_OrderParamsFull.f90` | `Main_OrderParamsFull.f90` |
 | `utils/Main_OrderParamsLowEn.f90` | `Main_OrderParamsLowEn.f90` |
-| New layer-resolved overlap driver | `compute_OrderParameterLayers.f90` |
+| Legacy raw layer-overlap export | `compute_OrderParameterLayers.f90` |
+| Corrected interlayer order-parameter projection | `compute_LayerOrderParameter.f90` |
 
 `postprocessing` describes these programs more precisely than `utils`.
 `Compute_*` names the observable calculation; `Main.f90` remains the
@@ -71,26 +72,44 @@ contributions using `OrderParameter.f90`. Their filenames are preserved.
 Both use `BuildGeometry` and `ReadFock` and select the producer's current
 `parameters`, rather than the restart-input settings. They write to `output/`.
 
-`compute_OrderParameterLayers` evaluates the raw six-term interlayer lattice
-overlaps in Eqs. (63)-(65) of `OrderParameterLayer.pdf`, for A and B centers and
-both layer directions. It writes one row per layer-1 center to
-`output/OrderParameterLayers-numb<ndim>-nspin<s><parameters>`. Since the note
-does not define the three delta vectors outside its unresolved figures, the
-driver uses the honeycomb convention implied by the site's `a1,a2` basis:
-`d1=(a1+a2)/3`, `d2=d1+a1`, `d3=d1+a2`. It pairs the two layer-center sets
-one-to-one by minimum displacement across periodic moire-cell images and uses
-the actual saved Fock-cell translations. The file contains the direct loop
-overlaps; it does not apply the note's later valley projection. Eqs. (27)-(52)
-and (67) contain bra/ket conjugation inconsistencies, so the projected `rho`
-values are omitted until those equations are corrected and re-derived. The new
-driver has been compile-checked, and `--check-geometry` verifies the center
-pairing, all loop-site lookups, and the required neighbor-cell translations
-without reading a Fock file.
-The numerical output still needs validation against a saved Fock state.
+`compute_LayerOrderParameter` implements the corrected inter-sublattice,
+inter-valley layer projection in Eqs. (63)-(83) of `OrderParameterLayer`.
+It follows the full saved-Fock driver, uses the same geometry/input helpers,
+and writes four complex components for both layer directions. The local map is
+`output/LayerOrderParameterLocal-numb<ndim>-nspin<s><parameters>`; normalized
+cell sums and per-cell values are in
+`output/LayerOrderParameter-numb<ndim>-nspin<s><parameters>`.
+It retains the full Bloch sum phase, uses the opposite layer direction in the
+conjugated mode, exchanges loop labels 2/3 at B centers, and averages the two
+center grids. All centers are sampled, with no extra factor of three.
+The valley labels agree with `OrderParameter.f90`.
+
+The first two raw loop channels average three neighboring hexagons, with the
+third retaining its central hexagon. This preserves the explicit valley phase
+and reproduces the legacy spatial averaging. The equal-layer production kernel
+agrees with the legacy inter-sublattice/inter-valley projection at every A
+center after removing the legacy position-dependent valley phase, also for
+a general periodic density matrix. The
+executable currently selects only the two interlayer directions; the
+equal-layer regression exercises its internal routines directly. See the
+[equal-layer comparison](layer_orderparameter.md#equal-layer-comparison-with-main_orderparamsfull)
+for the exact relation and test scope.
+
+The geometry builder's optional reference coordinates preserve exact lattice
+labels before relaxation, so lookup and Bloch phases use a fixed lattice gauge
+while center pairing/output use physical positions. `--check-geometry` validates
+all endpoints and saved translations without reading a Fock state.
+See [layer_orderparameter.md](layer_orderparameter.md) for the formulas,
+primitive-vector convention, output columns, normalization, and tests.
+
+`compute_OrderParameterLayers` is retained as the earlier raw-overlap export
+for existing workflows. Its original displaced-site convention differs from
+the nearest-neighbor convention in the corrected derivation. Use
+`compute_LayerOrderParameter` for the corrected projected density components.
 
 ## Common initialization
 
-All nine Fock-consuming programs use the shared initialization routines.
+All ten Fock-consuming programs use the shared initialization routines.
 For example, the response drivers use:
 
 ```fortran
@@ -159,8 +178,8 @@ running, for example:
 ```sh
 mkdir -p output output4
 ./postprocessing/.build/compute_plotBands
-./postprocessing/.build/compute_OrderParameterLayers --check-geometry
-./postprocessing/.build/compute_OrderParameterLayers
+./postprocessing/.build/compute_LayerOrderParameter --check-geometry
+./postprocessing/.build/compute_LayerOrderParameter
 ./postprocessing/.build/Compute_SpectralOptimize
 ./postprocessing/.build/Compute_KramersKronig
 ./postprocessing/.build/compute_localDos
@@ -189,17 +208,31 @@ The tests compile separate small Setup copies under `.build/tests/` and
   endpoint lookups, and required Fock-cell translations in `--check-geometry`
   mode; this geometry-only check does not need a saved Fock file.
 
-All ten complete programs compile and link. The 17 interface checks, six
-Hamiltonian/current checks, seven local-DOS checks and eight moved-driver
-checks pass (39 checks total, including the geometry-only check above). The
-band driver matches full-BZ diagonalization on a small fine grid, for both spin
-counts and both path orientations. The
-two legacy order-parameter drivers have tested geometry/Fock prologues; their
-complete observable calculations have not been independently validated. The
-new layer-overlap driver has not yet been run against saved Fock data. The
-maximum Hamiltonian discrepancy was zero in these cases; the maximum current
-discrepancy was 1.2e-9 in code units with a finite-difference step of 1e-6. These are small
-synthetic-state checks, not full self-consistent observable calculations.
+All eleven complete programs compile and link. The checks include 17 interface,
+six Hamiltonian/current, seven local-DOS, eight moved-driver, twelve layer
+projection, six layer-geometry cases, four equal-layer comparison fixtures,
+and the two default layer geometry checks.
+The layer projection tests use independent normalized Bloch spinors written as
+packed Fock files. They check every A/B center, both layer directions, complex
+phases, one/two spin sectors, gauge invariance, zero input, and cell/per-cell
+normalization. The layer geometry checks also cover Nam/Carr relaxation and
+reversed/equal layer rotations.
+The equal-layer fixtures compare the production averaged kernel to the actual
+legacy routine at all A centers in both layers, including boundaries, and run
+`Main_OrderParamsFull` on the same packed Fock files. They also check constant
+Dirac envelopes on interior A/B sites. The maximum equal-layer discrepancy
+is below `4e-18` for these fixtures after the known valley-phase conversion.
+
+The band driver matches full-BZ diagonalization on a small fine grid, for both
+spin counts and both path orientations. The two legacy order-parameter drivers
+have tested geometry/Fock prologues; the full saved-state driver's
+inter-sublattice/inter-valley channel additionally has the comparison above.
+Their other observable channels have not been independently validated. The maximum Hamiltonian discrepancy
+was zero in the small cases checked, and the maximum current discrepancy was
+1.2e-9 in code units with a finite-difference step of 1e-6. These tests use
+synthetic states; the new layer projection still needs a production-state
+convergence assessment of its smooth-envelope approximation.
+
 The local-DOS checks cover the complete driver, its missing dependencies,
 site-summed DOS, saved Mu, integrated maps and separate layer Fourier sums;
 see [localdos_dependencies.md](localdos_dependencies.md).
@@ -237,8 +270,8 @@ The imported spectral/Drude/local-DOS kernels are bilayer, one-stored-spin-secto
 legacy hopping model with zero layer bias. The drivers reject other layer/spin
 counts, `TBFunction=2`, and nonzero `Delta`, rather than silently evaluating
 only part of the requested model. The generic Fock reader and the migrated band/order-parameter drivers support
-both spin counts. Those three drivers continue to use dev's Hamiltonian and
-LAPACK modules, built separately under `.build/upstream/`; they are not subject
+both spin counts. These drivers use dev's modules, built separately under `.build/upstream/`;
+they are not subject
 to the legacy response-model restriction.
 
 The Hamiltonian exchange signs, conjugations and phases agree with dev for
