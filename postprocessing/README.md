@@ -13,6 +13,27 @@ with its momentum derivative, including the Bloch-basis correction.
 The spectral integration and diamagnetic formulas are retained; full production
 spectral/Drude/local-DOS calculations have not been validated.
 
+## Module structure
+
+The imported `postprocessing/Hamiltonian.f90` is removed. Sources follow the
+responsibilities of the `dev` layout:
+
+| Root source | Response additions |
+| --- | --- |
+| `Setup.f90` | `ResponseSetup`: response windows, temperature and output settings; imports physical settings from `Setup`. |
+| `Geometry.f90` | `ResponseGeometry`: legacy cell, relaxation and sampling helpers. The drivers continue to initialize geometry through `BuildGeometry` and dev's `Geometry`. |
+| `TightBinding.f90` | `ResponseTightBinding`: legacy hopping Hamiltonians and noninteracting current/diamagnetic operators. |
+| `HartreeFock.f90` | `ResponseHartreeFock`: mean-field Hamiltonians and interaction-dependent operators; uses dev's screening. |
+| `Spectral.f90` | `Spectral`: DOS, Drude, optical conductivity, thermal response, Kramers–Kronig, overlap and band-output routines. |
+
+The response namespaces keep legacy procedure signatures and full-band windows
+separate from the solver's selected-band interfaces. They are additional modules
+in the existing root source files; there is no second set of physical defaults.
+Compute drivers import `Spectral`. The original solver modules retain their
+interfaces. `Spectral.f90` is needed only for the postprocessing executables.
+The imported source has overlap routines but no separately named Berry routine;
+this reorganization adds no new Berry-curvature formula.
+
 ## Files and settings
 
 | Supplied program | Working program |
@@ -45,14 +66,14 @@ root and `utils` Setup files. The current imported producer defaults are
 `ntheta=9`, `nrelax=0`, `pressure=1.134`; the supplied legacy module originally
 used `ntheta=23`, `nrelax=1`, `pressure=1`.
 
-Response-only settings remain in this directory's `Hamiltonian.f90`:
+Response-only settings remain in the `ResponseSetup` namespace in `../Setup.f90`:
 temperatures, chemical-potential scan size, output directory (`output4/`), and
 the full response band window (`numb=ndim`, `ncb=ndim/2`). Each compute program
 keeps its original integration grid, `numkPlot`. It is independent of the
 producer's `numk`. The hard-coded interaction strengths in the driver prologues
 now use the producer's `alpha` and `alphaH`. Local DOS also uses the producer's
 selected band window (`Setup.numb/nLower/nUpper`); unlike the full response
-programs, it does not use `Hamiltonian.numb=ndim`.
+programs, it does not use `ResponseSetup.numb=ndim`.
 
 ## Band structure and order parameters
 
@@ -239,9 +260,9 @@ see [localdos_dependencies.md](localdos_dependencies.md).
 
 ## Retained routines and compatibility fixes
 
-The local Hamiltonian supplies many procedures absent upstream, including
+The response extensions supply procedures absent upstream, including
 velocity/diamagnetic operators, conductivity, Drude, thermal-response and
-Kramers–Kronig routines. The supplied modules are retained with the compatibility
+Kramers–Kronig routines. Their routines are distributed by responsibility with the compatibility
 changes below; the old scalar `fv` implementation has been removed.
 
 `longRange` delegates to dev's `LongRangeInteraction`. All 55 exchange and
@@ -289,9 +310,8 @@ production comparison.
 General energy-resolved DOS routines are included (`dosFull`, `dos_F` and
 related routines). The spectral drivers also retain their optional DOS output.
 The subsequently supplied `LocalDos.tar` is integrated as
-`compute_localDos.f90`. Its two missing LDOS routines are contained in the
-driver. The extra `HamiltonianPlot.f90`, `Spectral.f90` and LAPACK copy are
-unnecessary; only the existing shared modules are compiled. The dependency
+`compute_localDos.f90`. Its two LDOS routines are in the shared root `Spectral.f90`. The archive's duplicate `HamiltonianPlot.f90`, `Spectral.f90` and LAPACK
+copy are unnecessary; the driver uses the shared root `Spectral.f90`. The dependency
 audit and corrections are in [localdos_dependencies.md](localdos_dependencies.md).
 
 Local DOS reads the current state selected by `../Setup.f90`, including the

@@ -11,8 +11,8 @@ endif
 BUILD = .build
 PROGRAMS = Compute_Spectral Compute_SpectralFull Compute_SpectralOptimize Compute_DrudeFull Compute_KramersKronig compute_localDos
 UPSTREAM_PROGRAMS = compute_plotBands Main_OrderParamsFull Main_OrderParamsLowEn compute_OrderParameterLayers compute_LayerOrderParameter
-COMMON = LapackRoutines.f90 ../Setup.f90 ../TightBinding.f90 ../Geometry.f90 ../HartreeFock.f90 Hamiltonian.f90 PostProcessingInput.f90
-OBJECTS = LapackRoutines.o Setup.o TightBinding.o Geometry.o HartreeFock.o Hamiltonian.o PostProcessingInput.o
+COMMON = LapackRoutines.f90 ../Setup.f90 ../TightBinding.f90 ../Geometry.f90 ../HartreeFock.f90 ../Spectral.f90 PostProcessingInput.f90
+OBJECTS = LapackRoutines.o Setup.o TightBinding.o Geometry.o HartreeFock.o Spectral.o PostProcessingInput.o
 UPSTREAM_COMMON = ../LapackRoutines.f90 ../Setup.f90 ../TightBinding.f90 ../Geometry.f90 ../HartreeFock.f90 ../OrderParameter.f90 PostProcessingInput.f90
 UPSTREAM_OBJECTS = LapackRoutines.o Setup.o TightBinding.o Geometry.o HartreeFock.o OrderParameter.o PostProcessingInput.o
 

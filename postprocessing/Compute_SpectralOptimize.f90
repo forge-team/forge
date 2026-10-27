@@ -5,7 +5,7 @@
 program compute_spectral_optimize
 
 use omp_lib
-use Hamiltonian
+use Spectral
 use PostProcessingInput, only: BuildGeometry, ReadFock, InputParameters, ValidateResponseModel
 use Geometry, only: NumberNeighborCells, OrderNeighborCells
 use Setup, only: alphaInput => alpha, alphaHInput => alphaH
