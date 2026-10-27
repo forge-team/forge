@@ -1175,3 +1175,1035 @@ end subroutine dsort_list
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 end module TightBinding
+
+
+! Postprocessing compatibility namespace (shares the dev physical settings).
+! Compatibility routines grouped by the same responsibilities as FORGE dev.
+module ResponseTightBinding
+use ResponseSetup
+use lapack_routines
+implicit none
+contains
+
+subroutine ComplexH0(zh,coord,ndim,vk,tn)
+
+ integer(dp), intent(in)    :: ndim
+ real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3)
+ complex(dp), intent(out) :: zh(ndim,ndim)
+
+ integer(dp) :: i, j, nt
+ real(dp)    :: rij, coord_diff
+ complex(dp) :: zi_vk_tn,zphase
+
+
+zh = cmplx(0.0_dp,0.0_dp,dp)
+
+ do i = 1 , ndim
+   do j = 1 , i
+
+     zphase=exp(cmplx(0.0_dp,-dot_product(vk,coord(i,1:2)-coord(j,1:2))*fphase,dp))
+
+     rij = norm2(coord(i,:)-coord(j,:))
+
+     coord_diff = (coord(i,3)-coord(j,3))**2
+
+     if(coord_diff < deltaR .and. rij > deltaR) then
+       zh(i,j) = ft(rij)*zphase
+     endif
+
+     if(coord_diff > deltaR) then
+        zh(i,j) = ftperp(rij)*zphase
+     endif
+
+!!!!!! Coupling to adjacent Wigner-Seitz cell with tn
+     do nt = 1 , 3
+       rij = norm2(coord(i,:)-[coord(j,1:2)-tn(:,nt),coord(j,3)])
+       zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+       if(coord_diff < deltaR)then
+         zh(i,j)=zh(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase
+       else
+         zh(i,j)=zh(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase
+       endif
+!!!!!! Coupling to adjacent Wigner-Seitz cell with -tn
+  rij = norm2(coord(i,:)-[coord(j,1:2)+tn(:,nt),coord(j,3)])
+  zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,tn(:,nt)),dp)
+  if(coord_diff < deltaR)then
+    zh(i,j)=zh(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase
+  else
+    zh(i,j)=zh(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase
+  endif
+enddo
+
+   end do
+ end do
+
+ do i=1,ndim/4
+ zh(i,i)=zh(i,i)+mass1
+ j=i+ndim/4
+ zh(j,j)=zh(j,j)-mass1
+ enddo
+
+end subroutine ComplexH0
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!%
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+subroutine ComplexH0_phase(zh,coord,ind_j,ind_l,ndim,ind,vk,tn)
+
+ integer(dp), intent(in)    :: ndim,ind
+ integer(dp), intent(in)    :: ind_j(ind),ind_l(ind)
+ real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3)
+ complex(dp), intent(out) :: zh(ndim,ndim)
+
+ integer(dp) :: i, j, n1,n2,icount,ncount
+ real(dp)    :: rij, coord_diff,coord2(ndim,2)
+ complex(dp) :: zi_vk_tn,zphase
+
+
+zh = cmplx(0.0_dp,0.0_dp,dp)
+
+coord2(:,1:2)=coord(:,1:2)
+
+ncount=0
+
+ do i = 1 , ndim
+   do j = 1 , i
+
+     zphase=exp(cmplx(0.0_dp,-dot_product(vk,coord2(i,:)-coord2(j,:))*fphase,dp))
+
+     rij = norm2(coord(i,:)-coord(j,:))
+
+     coord_diff = (coord(i,3)-coord(j,3))**2
+
+     if(coord_diff < deltaR .and. rij > deltaR) then
+       zh(i,j) = ft(rij)*zphase
+     endif
+
+     if(coord_diff > deltaR) then
+        zh(i,j) = ftperp(rij)*zphase
+     endif
+
+     do icount=2,ind
+     n1=ind_j(icount)
+     n2=ind_l(icount)
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])
+
+   zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+   if(coord_diff < deltaR)then
+      zh(i,j)=zh(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase
+   else
+      zh(i,j)=zh(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase
+   endif
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)+n1*tn(:,1)+n2*tn(:,2),coord(j,3)])
+
+   zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+   if(coord_diff < deltaR)then
+      zh(i,j)=zh(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase
+   else
+      zh(i,j)=zh(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase
+   endif
+
+   enddo
+
+   end do
+ end do
+
+ !write(*,*) ncount/real(ndim*ndim)
+
+ do i=1,ndim/4
+ zh(i,i)=zh(i,i)+mass1
+ j=i+ndim/4
+ zh(j,j)=zh(j,j)-mass1
+ enddo
+
+
+end subroutine ComplexH0_phase
+
+!c!c!cC
+!c!c!cC
+!c!c!cC
+
+subroutine ComplexH0_sym(zh,coord,ndim,vk,tn)
+
+ integer(dp), intent(in)    :: ndim
+ real(dp)   , intent(in)    :: tn(2,3), vk(2)
+ real(dp)   , intent(in)    :: coord(ndim,3)
+ complex(dp), intent(inout) :: zh(ndim,ndim)
+
+ integer(dp) :: i, j, nt, l1, l2
+ real(dp)    :: rij, coord_diff
+ real(dp)     :: coord_sym1(3,3)
+ real(dp)     :: coord_sym2(3,3)
+ real(dp)     :: coord_temp(ndim,3)
+ complex(dp) :: zi_vk_tn
+
+
+
+zh(:,:) = cmplx(0.0_dp,0.0_dp,dp)
+
+coord_temp(:,:)=coord(:,:)
+
+coord_sym1(1,1)=(tn(1,2)+tn(1,3))/3.0_dp
+coord_sym1(1,2)=(tn(2,2)+tn(2,3))/3.0_dp
+coord_sym1(1,3)=coord_temp(ndim/2,3)
+
+coord_sym1(2,1)=(tn(1,1)-tn(1,3))/3.0_dp
+coord_sym1(2,2)=(tn(2,1)-tn(2,3))/3.0_dp
+coord_sym1(2,3)=coord_temp(ndim/2,3)
+
+coord_sym1(3,1)=-(tn(1,1)+tn(1,2))/3.0_dp
+coord_sym1(3,2)=-(tn(2,1)+tn(2,2))/3.0_dp
+coord_sym1(3,3)=coord_temp(ndim/2,3)
+
+coord_sym2(1,1)=(tn(1,1)+tn(1,2))/3.0_dp
+coord_sym2(1,2)=(tn(2,1)+tn(2,2))/3.0_dp
+coord_sym2(1,3)=coord(ndim,3)
+
+coord_sym2(2,1)=(tn(1,3)-tn(1,1))/3.0_dp
+coord_sym2(2,2)=(tn(2,3)-tn(2,1))/3.0_dp
+coord_sym2(2,3)=coord(ndim,3)
+
+coord_sym2(3,1)=-(tn(1,3)+tn(1,2))/3.0_dp
+coord_sym2(3,2)=-(tn(2,3)+tn(2,2))/3.0_dp
+coord_sym2(3,3)=coord(ndim,3)
+
+
+do l1=1,3
+do l2=1,3
+
+coord_temp(ndim/2,:)=coord_sym1(l1,:)
+coord_temp(ndim,:)=coord_sym2(l2,:)
+
+
+ do i = ndim/2,ndim,ndim/2
+   do j = 1 , ndim
+
+     rij = norm2(coord_temp(i,:)-coord_temp(j,:))
+
+     coord_diff = (coord_temp(i,3)-coord_temp(j,3))**2
+
+     if(coord_diff < deltaR .and. rij > deltaR) then
+       zh(i,j) = zh(i,j)+ft(rij)
+     endif
+     if(coord_diff > deltaR)then
+        zh(i,j) = zh(i,j)+ftperp(rij)
+     endif
+
+
+     do nt = 1 , 3
+       rij = norm2(coord_temp(i,:)-[coord_temp(j,1:2)-tn(:,nt),coord_temp(j,3)])
+       zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+       if(coord_diff < deltaR)then
+         zh(i,j)=zh(i,j)+ft(rij)*exp( zi_vk_tn)
+         zh(j,i)=zh(j,i)+ft(rij)*exp(-zi_vk_tn)
+       else
+         zh(i,j)=zh(i,j)+ftperp(rij)*exp( zi_vk_tn)
+         zh(j,i)=zh(j,i)+ftperp(rij)*exp(-zi_vk_tn)
+       endif
+     end do
+   end do
+ end do
+
+ do i = 1,ndim/2-1
+    do j = ndim/2, ndim,ndim/2
+
+      rij = norm2(coord_temp(i,:)-coord_temp(j,:))
+
+      coord_diff = (coord_temp(i,3)-coord_temp(j,3))**2
+
+      if(coord_diff < deltaR .and. rij > deltaR) then
+        zh(i,j) = zh(i,j)+ft(rij)
+      endif
+       if(coord_diff > deltaR)then
+         zh(i,j) = zh(i,j)+ftperp(rij)
+      endif
+
+ !!!!!! Coupling to adjacent Wigner-Seitz cell with tn
+      do nt = 1 , 3
+        rij = norm2(coord_temp(i,:)-[coord_temp(j,1:2)-tn(:,nt),coord_temp(j,3)])
+        zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+        if(coord_diff < deltaR)then
+          zh(i,j)=zh(i,j)+ft(rij)*exp( zi_vk_tn)
+          zh(j,i)=zh(j,i)+ft(rij)*exp(-zi_vk_tn)
+        else
+          zh(i,j)=zh(i,j)+ftperp(rij)*exp( zi_vk_tn)
+          zh(j,i)=zh(j,i)+ftperp(rij)*exp(-zi_vk_tn)
+        endif
+      end do
+    end do
+  end do
+
+  do i = ndim/2+1,ndim-1
+     do j = ndim/2, ndim,ndim/2
+
+       rij = norm2(coord_temp(i,:)-coord_temp(j,:))
+
+       coord_diff = (coord_temp(i,3)-coord_temp(j,3))**2
+
+       if(coord_diff < deltaR .and. rij > deltaR) then
+         zh(i,j) = zh(i,j)+ft(rij)
+       endif
+       if(coord_diff > deltaR)then
+          zh(i,j) = zh(i,j)+ftperp(rij)
+       endif
+
+  !!!!!! Coupling to adjacent Wigner-Seitz cell with tn
+       do nt = 1 , 3
+         rij = norm2(coord_temp(i,:)-[coord_temp(j,1:2)-tn(:,nt),coord_temp(j,3)])
+         zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+         if(coord_diff < deltaR)then
+           zh(i,j)=zh(i,j)+ft(rij)*exp( zi_vk_tn)
+           zh(j,i)=zh(j,i)+ft(rij)*exp(-zi_vk_tn)
+         else
+           zh(i,j)=zh(i,j)+ftperp(rij)*exp( zi_vk_tn)
+           zh(j,i)=zh(j,i)+ftperp(rij)*exp(-zi_vk_tn)
+         endif
+       end do
+     end do
+   end do
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+enddo
+enddo
+
+zh(:,:)=zh(:,:)/cmplx(9.0_dp,0.0_dp,dp)
+
+!!!!!!!!!!! Layer 1
+
+ do i = 1 , ndim/2-1
+   do j = 1 , ndim/2-1
+
+     rij = norm2(coord_temp(i,:)-coord_temp(j,:))
+
+       if(rij > deltaR) then
+       zh(i,j) = zh(i,j)+ft(rij)
+       endif
+
+     do nt = 1 , 3
+       rij = norm2(coord_temp(i,:)-[coord_temp(j,1:2)-tn(:,nt),coord_temp(j,3)])
+       zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+
+       zh(i,j)=zh(i,j)+ft(rij)*exp( zi_vk_tn)
+       zh(j,i)=zh(j,i)+ft(rij)*exp(-zi_vk_tn)
+     end do
+
+   end do
+ end do
+
+!!!!!!!!!!! Layer 2
+
+ do i = ndim/2+1,ndim-1
+   do j = ndim/2+1,ndim-1
+
+     rij = norm2(coord_temp(i,:)-coord_temp(j,:))
+
+     if(rij > deltaR) then
+       zh(i,j) = zh(i,j)+ft(rij)
+     endif
+
+     do nt = 1 , 3
+       rij = norm2(coord_temp(i,:)-[coord_temp(j,1:2)-tn(:,nt),coord_temp(j,3)])
+       zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+
+       zh(i,j)=zh(i,j)+ft(rij)*exp( zi_vk_tn)
+       zh(j,i)=zh(j,i)+ft(rij)*exp(-zi_vk_tn)
+     end do
+
+   end do
+ end do
+
+!!!!!!!!!!! Coupling Layer 1 to Layer 2
+
+do i = 1 , ndim/2-1
+   do j = ndim/2+1 , ndim-1
+
+     rij = norm2(coord_temp(i,:)-coord_temp(j,:))
+
+     zh(i,j) = zh(i,j)+ftperp(rij)
+
+     do nt = 1 , 3
+       rij = norm2(coord_temp(i,:)-[coord_temp(j,1:2)-tn(:,nt),coord_temp(j,3)])
+       zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+         zh(i,j)=zh(i,j)+ftperp(rij)*exp( zi_vk_tn)
+         zh(j,i)=zh(j,i)+ftperp(rij)*exp(-zi_vk_tn)
+     end do
+
+   end do
+ end do
+
+!!!!!!!!!!! Coupling Layer 2 to Layer 1
+
+ do i = ndim/2+1 , ndim-1
+    do j = 1 , ndim/2-1
+
+      rij = norm2(coord_temp(i,:)-coord_temp(j,:))
+
+      zh(i,j) = zh(i,j)+ftperp(rij)
+
+      do nt = 1 , 3
+        rij = norm2(coord_temp(i,:)-[coord_temp(j,1:2)-tn(:,nt),coord_temp(j,3)])
+        zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+          zh(i,j)=zh(i,j)+ftperp(rij)*exp( zi_vk_tn)
+          zh(j,i)=zh(j,i)+ftperp(rij)*exp(-zi_vk_tn)
+      end do
+
+    end do
+  end do
+
+
+
+end subroutine ComplexH0_sym
+
+
+!c!c!cC
+!c!c!cC
+!c!c!cC
+
+pure function ftperp(r)
+
+ real(dp), intent(in) :: r
+ real(dp) :: ftperp
+
+ real(dp) :: pd
+
+ pd=(d0/r)**2
+
+ ftperp = (-2.7_dp*exp((a0-r)/r0)*(1.0_dp-pd)+0.48_dp*exp((d0*pressure-r)/r0)*pd)*tperp
+
+end function ftperp
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+pure function ft(r)
+
+ real(dp), intent(in) :: r
+ real(dp) :: ft
+
+ !if( r <= 1.01_dp*a0.AND.r>deltaR) then
+ if( r>deltaR) then
+   ft = -2.7_dp*exp((a0-r)/r0)
+ else
+   ft = 0.0_dp
+ end if
+
+end function ft
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!%
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+subroutine vx_new(zvx,ndim,coord,vk,tn,xy)
+
+ integer(dp), intent(in)    :: ndim, xy
+ real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3)
+ complex(dp), intent(inout) :: zvx(:,:)
+
+ integer(dp) :: i, j, nt
+ real(dp) :: rij, rxy, coord_diff
+ complex(dp) :: zi_vk_tn
+
+ zvx = cmplx(0.0_dp,0.0_dp,dp)
+
+ do i = 1 , ndim
+   do j = i , ndim
+
+     rij = norm2(coord(i,:)-coord(j,:))
+     rxy  = coord(i,xy)-coord(j,xy)
+     coord_diff = (coord(i,3)-coord(j,3))**2
+
+     if(coord_diff < deltaR .and. rij > deltaR) then
+       zvx(i,j) = cmplx(0.0_dp,ft(rij)*rxy,dp)
+     end if
+
+     if(coord_diff > deltaR)then
+       zvx(i,j) = cmplx(0.0_dp,ftperp(rij)*rxy,dp)
+     endif
+
+!!!!!!! Coupling to adjacent Wigner-Seitz cell with tn
+     !do nt = 1 , 3
+      ! rij = norm2(coord(i,:)-[coord(j,1:2)-tn(:,nt),coord(j,3)])
+       !rxy=coord(i,xy)-coord(j,xy)+tn(xy,nt)
+       !zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+
+       !if(coord_diff < deltaR) then
+        ! zvx(i,j)=zvx(i,j)+ft(rij)*exp( zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+        ! zvx(j,i)=zvx(j,i)-ft(rij)*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+       !else
+        ! zvx(i,j)=zvx(i,j)+ftperp(rij)*exp( zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+        ! zvx(j,i)=zvx(j,i)-ftperp(rij)*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+       !endif
+     !end do
+
+     !!!!!! Coupling to adjacent Wigner-Seitz cell with tn
+     do nt = 1 , 3
+       rij = norm2(coord(i,:)-[coord(j,1:2)-tn(:,nt),coord(j,3)])
+       rxy=coord(i,xy)-coord(j,xy)+tn(xy,nt)
+       zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+       if(coord_diff < deltaR)then
+         zvx(i,j)=zvx(i,j)+ft(rij)*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+       else
+         zvx(i,j)=zvx(i,j)+ftperp(rij)*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+       endif
+     !!!!!! Coupling to adjacent Wigner-Seitz cell with -tn
+    rij = norm2(coord(i,:)-[coord(j,1:2)+tn(:,nt),coord(j,3)])
+    rxy=coord(i,xy)-coord(j,xy)-tn(xy,nt)
+    zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,tn(:,nt)),dp)
+    if(coord_diff < deltaR)then
+        zvx(i,j)=zvx(i,j)+ft(rij)*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+    else
+        zvx(i,j)=zvx(i,j)+ftperp(rij)*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+    endif
+    enddo
+
+   end do
+ end do
+
+end subroutine vx_new
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!%
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+subroutine vxy12I(zvxy1,zvxy2,zvxyI,ndim,coord,vk,tn,xy)
+
+ integer(dp), intent(in)    :: ndim, xy
+ real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3)
+ complex(dp), intent(inout) :: zvxy1(:,:),zvxy2(:,:),zvxyI(:,:)
+
+ integer(dp) :: i, j, nt
+ real(dp) :: rij, rxy, coord_diff
+ complex(dp) :: zi_vk_tn
+
+ zvxy1 = cmplx(0.0_dp,0.0_dp,dp)
+ zvxy2 = cmplx(0.0_dp,0.0_dp,dp)
+ zvxyI = cmplx(0.0_dp,0.0_dp,dp)
+
+ do i = 1 , ndim
+   do j = i , ndim
+
+     rij = norm2(coord(i,:)-coord(j,:))
+     rxy  = coord(i,xy)-coord(j,xy)
+
+     if(     coord(i,3)<deltaR .and. coord(j,3)<deltaR .and. rij>deltaR) then
+       zvxy1(i,j) = cmplx(0.0_dp,ft(rij)*rxy,dp)
+     else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR .and. rij>deltaR) then
+       zvxy2(i,j) = cmplx(0.0_dp,ft(rij)*rxy,dp)
+     else
+       zvxyI(i,j) = cmplx(0.0_dp,ftperp(rij)*rxy,dp)
+     endif
+
+     !!!!!! Coupling to adjacent Wigner-Seitz cell with tn
+     do nt = 1 , 3
+       rij = norm2(coord(i,:)-[coord(j,1:2)-tn(:,nt),coord(j,3)])
+       rxy=coord(i,xy)-coord(j,xy)+tn(xy,nt)
+       zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+       if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+         zvxy1(i,j)=zvxy1(i,j)+ft(rij)*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+       else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+         zvxy2(i,j)=zvxy2(i,j)+ft(rij)*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+       else
+         zvxyI(i,j)=zvxyI(i,j)+ftperp(rij)*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+       endif
+     !!!!!! Coupling to adjacent Wigner-Seitz cell with -tn
+    rij = norm2(coord(i,:)-[coord(j,1:2)+tn(:,nt),coord(j,3)])
+    rxy=coord(i,xy)-coord(j,xy)-tn(xy,nt)
+    zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,tn(:,nt)),dp)
+    if(coord(i,3)<deltaR .and. coord(j,3)<deltaR)then
+        zvxy1(i,j)=zvxy1(i,j)+ft(rij)*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+    else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+        zvxy2(i,j)=zvxy2(i,j)+ft(rij)*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+        else
+         zvxyI(i,j)=zvxyI(i,j)+ftperp(rij)*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+    endif
+    enddo
+
+   end do
+ end do
+
+end subroutine vxy12I
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!%
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+subroutine vxy1_new(zvxy1,zvxy2,ndim,coord,vk,tn,xy)
+
+ integer(dp), intent(in)    :: ndim, xy
+ real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3)
+ complex(dp), intent(inout) :: zvxy1(:,:), zvxy2(:,:)
+
+ integer(dp) :: i, j, nt
+ real(dp) :: rij, rxy
+ complex(dp) :: zi_vk_tn
+
+ zvxy1 = cmplx(0.0_dp,0.0_dp,dp)
+ zvxy2 = cmplx(0.0_dp,0.0_dp,dp)
+
+ do i = 1 , ndim
+   do j = 1 , ndim
+
+     rij = norm2(coord(i,:)-coord(j,:))
+     rxy = coord(i,xy)-coord(j,xy)
+
+     if(     coord(i,3)<deltaR .and. coord(j,3)<deltaR .and. rij>deltaR) then
+       zvxy1(i,j) = cmplx(0.0_dp,ft(rij)*rxy,dp)
+     else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR .and. rij>deltaR) then
+       zvxy2(i,j) = cmplx(0.0_dp,ft(rij)*rxy,dp)
+     endif
+
+!!!!!!! Coupling to adjacent Wigner-Seitz cell with tn
+     do nt = 1 , 3
+       rij = norm2(coord(i,:)-[coord(j,1:2)-tn(:,nt),coord(j,3)])
+       rxy = (coord(i,xy)-coord(j,xy)+tn(xy,nt))
+       zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+
+       if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+         zvxy1(i,j)=zvxy1(i,j)+ft(rij)*exp( zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+         zvxy1(j,i)=zvxy1(j,i)-ft(rij)*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+       else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+         zvxy2(i,j)=zvxy2(i,j)+ft(rij)*exp( zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+         zvxy2(j,i)=zvxy2(j,i)-ft(rij)*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+       endif
+     end do
+
+   end do
+ end do
+
+end subroutine vxy1_new
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!%
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+subroutine vxyI_new(zvxy,ndim,coord,vk,tn,xy)
+
+ integer(dp), intent(in)    :: ndim, xy
+ real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3)
+ complex(dp), intent(inout) :: zvxy(:,:)
+
+ integer(dp) :: i, j, nt
+ real(dp) :: rij, rxy, coord_diff
+ complex(dp) :: zi_vk_tn
+
+ zvxy = cmplx(0.0_dp,0.0_dp,dp)
+
+ do i = 1 , ndim
+   do j = 1 , ndim
+
+     rij = norm2(coord(i,:)-coord(j,:))
+     rxy = coord(i,xy)-coord(j,xy)
+     coord_diff = (coord(i,3)-coord(j,3))**2
+
+     if(coord_diff>deltaR) then
+       zvxy(i,j) = cmplx(0.0_dp,ftperp(rij)*rxy,dp)
+     endif
+
+!!!!!!! Coupling to adjacent Wigner-Seitz cell with tn
+     do nt = 1 , 3
+       rij = norm2(coord(i,:)-[coord(j,1:2)-tn(:,nt),coord(j,3)])
+       rxy=(coord(i,xy)-coord(j,xy)+tn(1, nt))
+       zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+
+       if(coord_diff>deltaR) then
+         zvxy(i,j)=zvxy(i,j)+ftperp(rij)*exp( zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+         zvxy(j,i)=zvxy(j,i)-ftperp(rij)*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+       endif
+     end do
+
+   end do
+ end do
+
+end subroutine vxyI_new
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!%
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+subroutine vxy1D_new(zvxy,ndim,coord,vk,tn,xy)
+
+ integer(dp), intent(in)    :: ndim, xy
+ real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3)
+ complex(dp), intent(inout) :: zvxy(:,:)
+
+ integer(dp) :: i, j, nt
+ real(dp) :: rij, rxy, coord_diff
+ complex(dp) :: zi_vk_tn
+
+ zvxy = cmplx(0.0_dp,0.0_dp,dp)
+
+ do i = 1 , ndim
+   do j = 1 , ndim
+
+     rij = norm2(coord(i,:)-coord(j,:))
+     rxy = coord(i,xy)-coord(j,xy)
+     coord_diff = (coord(i,3)-coord(j,3))**2
+
+     if(coord(i,3)<deltaR .and. coord(j,3)<deltaR .and. rij>deltaR) then
+       zvxy(i,j)=ft(rij)*rxy**2
+     endif
+
+!!!!!!! Coupling to adjacent Wigner-Seitz cell with tn
+     do nt = 1 , 3
+       rij = norm2(coord(i,:)-[coord(j,1:2)-tn(:,nt),coord(j,3)])
+       rxy=(coord(i,xy)-coord(j,xy)+tn(1, nt))
+       zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+
+       if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+         zvxy(i,j)=zvxy(i,j)+ft(rij)*exp( zi_vk_tn)*rxy**2
+         zvxy(j,i)=zvxy(j,i)+ft(rij)*exp(-zi_vk_tn)*rxy**2
+       endif
+     end do
+
+   end do
+ end do
+
+
+end subroutine vxy1D_new
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!%
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+!c!c!cC
+!c!c!cC
+!c!c!cC
+
+
+!c!c!cC
+!c!c!cC
+!c!c!cC
+
+
+subroutine vxyID_new(zvxy,ndim,coord,vk,tn,xy)
+
+ integer(dp), intent(in)    :: ndim, xy
+ real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3)
+ complex(dp), intent(inout) :: zvxy(:,:)
+
+ integer(dp) :: i, j, nt
+ real(dp) :: rij, rxy, coord_diff
+ complex(dp) :: zi_vk_tn
+
+ zvxy = cmplx(0.0_dp,0.0_dp,dp)
+
+ do i = 1 , ndim
+   do j = 1 , ndim
+
+     rij = norm2(coord(i,:)-coord(j,:))
+     rxy = coord(i,xy)-coord(j,xy)
+     coord_diff = (coord(i,3)-coord(j,3))**2
+
+     if(coord_diff>deltaR) then
+       zvxy(i,j)=ftperp(rij)*rxy**2
+     endif
+
+!!!!!!! Coupling to adjacent Wigner-Seitz cell with tn
+     do nt = 1 , 3
+       rij = norm2(coord(i,:)-[coord(j,1:2)-tn(:,nt),coord(j,3)])
+       rxy=(coord(i,xy)-coord(j,xy)+tn(1, nt))
+       zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+
+       if(coord_diff>deltaR) then
+         zvxy(i,j)=zvxy(i,j)+ftperp(rij)*exp( zi_vk_tn)*rxy**2
+         zvxy(j,i)=zvxy(j,i)+ftperp(rij)*exp(-zi_vk_tn)*rxy**2
+       endif
+     end do
+
+   end do
+ end do
+
+end subroutine vxyID_new
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!%
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+subroutine ComplexH0_delta_magneticfield(zh,coord,ndimq,vk,Delta,tn,vq1,vq2,p,q)
+
+  integer(dp), intent(in)    :: ndimq, p, q
+  real(dp)   , intent(in)    :: tn(2,3), vk(2), vq1(2), vq2(2), coord(ndimq,3),Delta
+  complex(dp), intent(inout) :: zh(ndimq,ndimq)
+
+  integer(dp) :: i, j, nt
+  real(dp)    :: rij, coord_diff
+  complex(dp) :: zi_vk_tn, ph
+
+  zh(:,:) = cmplx(0.0_dp,0.0_dp,dp)
+
+  ! We are always doing Delta=0, so this doesn't make a difference
+  do i = 1 , ndimq/q/4
+    do j = 0,q-1
+      zh(i+j*ndimq/q,i+j*ndimq/q) = zh(i+j*ndimq/q,i+j*ndimq/q) + Delta !A1
+      !zh(i+ndimq/q/2+j*ndimq/q,i+ndimq/q/2+j*ndimq/q) = zh(i+ndimq/q/2+j*ndimq/q,i+ndimq/q/2+j*ndimq/q) + Delta  !A2
+      zh(i+ndimq/q/4+j*ndimq/q,i+ndimq/q/4+j*ndimq/q) = zh(i+ndimq/q/4+j*ndimq/q,i+ndimq/q/4+j*ndimq/q) - Delta !B1
+      !zh(i+3*ndimq/q/4+j*ndimq/q,i+3*ndimq/q/4+j*ndimq/q) = zh(i+3*ndimq/q/4+j*ndimq/q,i+3*ndimq/q/4+j*ndimq/q) - Delta  !B2
+    enddo
+  enddo
+
+  do i = 1 , ndimq
+    do j = 1 , ndimq
+
+      ! Compute the phase factor(we have passed the magnetic lattice vectors(tn) and the Moire reciprocal vectors(vq).
+      ! Also, notice that in the last argument ntheta=0.0_dp.)
+      rij = norm2(coord(i,:)-coord(j,:))
+      coord_diff = (coord(i,3)-coord(j,3))**2
+      ph = phase([coord(i,1:2),coord(j,1:2)],[vq1, vq2],[tn(1:2,1), tn(1:2,2)],p,q)
+      ! ph = phase2([coord(i,1:2),coord(j,1:2)],[vq1, vq2],[tn(1:2,1), tn(1:2,2)],p,q)
+
+
+      if(coord_diff < deltaR) then
+        zh(i,j) = zh(i,j) + 0.5_dp*ft(rij)*ph
+        zh(j,i) = zh(j,i) + 0.5_dp*ft(rij)*conjg(ph)
+      else
+        zh(i,j) = zh(i,j) + 0.5_dp*ftperp(rij)*ph
+        zh(j,i) = zh(j,i) + 0.5_dp*ftperp(rij)*conjg(ph)
+      endif
+
+      !!!!!! Coupling to adjacent Wigner-Seitz cell with tn
+      do nt = 1 , 3
+        rij = norm2(coord(i,:)-[coord(j,1:2)-tn(:,nt),coord(j,3)])
+        zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+        ph = phase([coord(i,1:2),coord(j,1:2)-tn(:,nt)],[vq1, vq2],[tn(:,1), tn(:,2)],p,q)
+        ! ph = phase2([coord(i,1:2),coord(j,1:2)-tn(:,nt)],[vq1, vq2],[tn(:,1), tn(:,2)],p,q)
+
+        if(coord_diff < deltaR)then
+          zh(i,j)=zh(i,j)+ft(rij)*exp( zi_vk_tn)*ph
+          ! zh(j,i)=zh(j,i)+ft(rij)*exp(-zi_vk_tn)*phase([coord(j,1:2)-tn(:,nt),coord(i,1:2)],[vq1, vq2],[tn(:,1), tn(:,2)],p,q)
+
+          zh(j,i)=zh(j,i) + ft(rij)*exp(-zi_vk_tn)*conjg(ph)
+
+        else
+          zh(i,j)=zh(i,j)+ftperp(rij)*exp( zi_vk_tn)*ph
+          ! zh(j,i)=zh(j,i)+ftperp(rij)*exp(-zi_vk_tn)* &
+            ! phase([coord(j,1:2)-tn(:,nt),coord(i,1:2)],[vq1, vq2],[tn(:,1), tn(:,2)],p,q)
+
+          zh(j,i)=zh(j,i)+ ftperp(rij)*exp(-zi_vk_tn)*conjg(ph)
+        endif
+
+      end do
+
+    end do
+  end do
+
+ end subroutine ComplexH0_delta_magneticfield
+
+  !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  !%
+  !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+ function phase(coord,vq,ts,p,q)
+  integer(dp), intent(in)    :: p, q
+  real(dp)   , intent(in)    :: ts(4), coord(4), vq(4)
+  ! complex(dp), intent(inout) :: zh
+
+  complex(dp) :: phase
+  integer(dp) :: i, j
+  real(dp)    :: ei(2), ej(2), ci(2), cj(2), vq1(2), vq2(2)
+  complex(dp) :: zi = (0.0_dp,1.0_dp), ph01, ph02, ph0
+
+  vq1 = vq(1:2)
+  vq2 = vq(3:4)
+  ci = coord(1:2)
+  cj = coord(3:4)
+  ! write(*,*) ci
+  ! write(*,*) cj
+
+  ! Coordinates in terms of t1 and t2(the Moire lattice vectors. Notice that we passed tq, so we have t2=t2q/q)
+  call ecoords(ei,ci,[ts(1:2), ts(3:4)/real(q)])
+  call ecoords(ej,cj,[ts(1:2), ts(3:4)/real(q)])
+
+  ! Compute phases. See the definitions of rho and sumek below
+  if (abs(ej(1)-ei(1)) .gt. 1e-9_dp) then
+    ph01 = dot_product(vq2,cj-ci)/(ej(1)-ei(1))* &
+    ((ej(1)**2-ei(1)**2)/2 - (rho(ej(1)) - rho(ei(1))))
+    ph02 = dot_product(vq1,cj-ci)/abs(ej(1)-ei(1))*sumek(ei,ej)
+    ph0 = ph01 - ph02
+
+    phase = exp(zi*ph0*real(p,dp)/real(q,dp))
+
+  else
+    ph0 = (ei(1) - real(floor(ei(1)+1e-9_dp),dp))*dot_product(vq2,cj-ci)
+    phase = exp(zi*ph0*real(p,dp)/real(q,dp))
+  endif
+
+  end function phase
+
+  !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  !%
+  !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  function phase2(coord,vq,ts,p,q)
+
+    integer(dp), intent(in)    :: p, q
+    real(dp)   , intent(in)    :: ts(4), coord(4), vq(4)
+    ! complex(dp), intent(inout) :: zh
+
+    complex(dp) :: phase2
+    integer(dp) :: i, j
+    real(dp)    :: ei(2), ej(2), ci(2), cj(2), vq1(2), vq2(2)
+    complex(dp) :: zi = (0.0_dp,1.0_dp), ph0
+
+    vq1 = vq(1:2)
+    vq2 = vq(3:4)
+    ci = coord(1:2)
+    cj = coord(3:4)
+    ! write(*,*) ci
+    ! write(*,*) cj
+
+    ! Coordinates in terms of t1 and t2(the Moire lattice vectors. Notice that we passed tq, so we have t2=t2q/q)
+    call ecoords(ei,ci,[ts(1:2), ts(3:4)/real(q)])
+    call ecoords(ej,cj,[ts(1:2), ts(3:4)/real(q)])
+
+    ! Compute phases. See the definitions of rho and sumek below
+    ph0 = dot_product(vq2,cj-ci)*(ej(1) + ei(1))/2 - 2*pi*ej(2)*floor(ej(1)+1e-9) +  2*pi*ei(2)*floor(ei(1)+1e-9)
+    phase2 = exp(zi*ph0*real(p,dp)/real(q,dp))
+
+
+  end function phase2
+
+  !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  !%
+  !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  subroutine ecoords(e,c,ts)
+    real(dp), intent(in) :: c(2), ts(4)
+    real(dp), intent(inout) :: e(2)
+    ! Calculate e such that e1*t1 + e2*t2 = c
+    ! Solve linear equation (ts(1)=t1(1), ts(2)=t1(2), ts(3)=t2(1), ts(4)=t2(2))
+    e = 1/(ts(1)*ts(4)-ts(2)*ts(3))*[ts(4)*c(1)-ts(3)*c(2), -ts(2)*c(1)+ts(1)*c(2)]
+  end subroutine ecoords
+
+  !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  !%
+  !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  function sumek(ei,ej)
+    real(dp), intent(in) :: ei(2), ej(2)
+
+    real(dp) :: sumek
+    integer(4) :: i, d
+    ! Sum of the different values of e2 when e1=integer along the path
+    sumek = 0.0_dp
+    ! d tells us the number of times e1=integer along the path (notice +1e-9 to avoid rounding errors)
+    d = floor(ej(1)+1e-9_dp) - floor(ei(1)+1e-9_dp)
+    if (d .ne. 0) then
+      ! if d>0, we loop from floor(ei(1))+1 to floor(ej(1)). Else we loop from floor(ei(1)) to floor(ej(1))+1
+      do i=floor(ei(1)+1e-9_dp)+(d/iabs(d)+1)/2, floor(ei(1)+1e-9_dp)+d-(d/iabs(d)-1)/2, d/iabs(d)
+        !we add the value of e2 when e1=i
+        sumek = sumek + ei(2) + (ei(1)-real(i,dp))*(ej(2)-ei(2))/(ei(1)-ej(1))
+      enddo
+    endif
+  end function sumek
+
+  !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  !%
+  !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  function rho(x)
+    real(dp), intent(in) :: x
+    real(dp) :: rho
+    ! Notice the -1e-9 to avoid rounding errors when x is exactly an integer
+    rho = real(floor(x+1e-9_dp),dp)*real(floor(x+1e-9_dp)-1,dp)/2 + real(floor(x+1e-9_dp),dp)*(x - real(floor(x+1e-9_dp),dp))
+
+  end function rho
+
+    !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  !%
+  !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  function gcd(a,b)
+    ! We compute the greatest common divisor by Euclid's method
+    integer(dp), intent(in) :: a,b
+
+    integer(dp) :: a1,b1,c,gcd
+    a1 = a
+    b1 = b
+    if ((a1.EQ.0).OR.(b1.EQ.0)) then
+      if ((a1.EQ.1).OR.(b1.EQ.1)) then
+        b1 = 1
+      else
+        b1 = 0
+      endif
+    else
+      if (b1 .gt. a1) then
+        c=a1
+        a1=b1
+        b1=c
+      endif
+      do
+        c = mod(a1,b1)
+        if (c .eq. 0) exit
+        a1 = b1
+        b1 = c
+      enddo
+    endif
+    gcd = b1
+
+  end function gcd
+
+  !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  !%
+  !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  subroutine vx_magneticfield(zvx,ndim,coord,vk,tn,xy,vq1,vq2,p,q)
+
+    integer(dp), intent(in)    :: ndim, xy, p, q
+    real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3), vq1(2), vq2(2)
+    complex(dp), intent(inout) :: zvx(:,:)
+
+    integer(dp) :: i, j, t
+    real(dp) :: rij, rxy, coord_diff
+    complex(dp) :: zi_vk_tn, ph
+
+    zvx = cmplx(0.0_dp,0.0_dp,dp)
+
+    do i = 1 , ndim
+      do j = 1 , ndim
+
+        rij = norm2(coord(i,:)-coord(j,:))
+        rxy  = coord(i,xy)-coord(j,xy)
+        coord_diff = (coord(i,3)-coord(j,3))**2
+        ph = phase2([coord(i,1:2),coord(j,1:2)],[vq1, vq2],[tn(1:2,1), tn(1:2,2)],p,q)
+
+        if(coord_diff < deltaR .and. rij > deltaR) then
+          zvx(i,j) = cmplx(0.0_dp,ft(rij)*rxy,dp)*ph
+        end if
+
+        if(coord_diff > deltaR)then
+          zvx(i,j) = cmplx(0.0_dp,ftperp(rij)*rxy,dp)*ph
+        endif
+
+   !!!!!!! Coupling to adjacent Wigner-Seitz cell with tn
+        do t = 1 , 3
+          rij = norm2(coord(i,:)-[coord(j,1:2)-tn(:,t),coord(j,3)])
+          rxy=(coord(i,xy)-coord(j,xy)+tn(xy,t))
+          zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,t)),dp)
+          ph = phase2([coord(i,1:2),coord(j,1:2)-tn(:,t),coord(j,3)],[vq1, vq2],[tn(1:2,1), tn(1:2,2)],p,q)
+
+          if(coord_diff < deltaR) then
+            zvx(i,j)=zvx(i,j)+ft(rij)*exp( zi_vk_tn)*cmplx(0.0_dp,rxy,dp)*ph
+            zvx(j,i)=zvx(j,i)-ft(rij)*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)*conjg(ph)
+          else
+            zvx(i,j)=zvx(i,j)+ftperp(rij)*exp( zi_vk_tn)*cmplx(0.0_dp,rxy,dp)*ph
+            zvx(j,i)=zvx(j,i)-ftperp(rij)*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)*conjg(ph)
+          endif
+        end do
+
+      end do
+    end do
+
+   end subroutine vx_magneticfield
+
+
+  !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+end module ResponseTightBinding

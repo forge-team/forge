@@ -6,7 +6,7 @@
 ! Bands is never computed nor read, so numkPostProc can be much larger than the numk of the Fock matrix.
 ! The Fermi energy is the last value in the Mu output of the self-consistent run.
 
-program bandstructure
+program compute_plotBands
 
 use omp_lib
 use Setup
@@ -14,22 +14,25 @@ use Geometry
 use TightBinding
 use HartreeFock
 use lapack_routines
+use PostProcessingInput, only: BuildGeometry, InputParameters, ReadFock
 
 implicit none
 
 
-! Plot lines options
+! Plot grid and path options
+integer(dp), parameter :: numkPostProc = 60
+character(240) :: outputSuffix
 integer(dp), parameter :: nMirrorPath = 0    ! 0: Kp -> G -> K -> M -> G -> K / 1: mirrored path  K -> G -> Kp -> M -> G -> Kp
 
 character(300) :: filename
+character(210) :: inputSuffix
 integer(dp), parameter :: NkB = numkPostProc*numkPostProc
 integer(dp) :: n, m, i, j, nspin, numNeighborCells, rcc, my_iostat
 integer(dp) :: ivk, ivk1, ivk2, jvk1, jvk2, iflat, ipath, ipoint, numPath, numPoints
 
-real(dp) :: aMoire, cs, sn, FermiEnergy, itinput, muinput
+real(dp) :: FermiEnergy, itinput, muinput
 real(dp) :: t1(2), t2(2), t3(2), tn(6,2), tnHF(2,3), g1(2), g12(2), RotMatrix(2,2), vk(2)
 
-complex(dp) :: zinput
 
 integer(dp), allocatable :: nUnitCell_1(:), nUnitCell_2(:)
 integer(dp), allocatable :: NearestNeighborsUC(:,:), NearestNeighborsT(:,:)
@@ -75,46 +78,8 @@ call OrderNeighborCells(numI, numNeighborCells, nUnitCell_1, nUnitCell_2)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 ! reciprocal lattice vectors of the superlattice
-aMoire = 3.0_dp*ntheta**2 + 3.0_dp*ntheta + 1.0_dp
-g1  =  (4.0_dp*pi/3.0_dp)/aMoire*(real(3*ntheta+1,dp)*a1+a2)
-g12 =  (4.0_dp*pi/3.0_dp)/aMoire*(real(3*ntheta+2,dp)*a2-a1)
-
-cs = 1.0_dp-1.0_dp/(2.0_dp*aMoire)
-sn = sqrt(1.0_dp-cs**2)
-RotMatrix = reshape([cos(0.5_dp*acos(cs)),-sin(0.5_dp*acos(cs)),sin(0.5_dp*acos(cs)),cos(0.5_dp*acos(cs))],[2,2])
-
-g1  = matmul(RotMatrix,g1)
-g12 = matmul(RotMatrix,g12)
-
-! fine grid of the band structure, independent of the numk of the Fock matrix
+call BuildGeometry(Coords,t1,t2,t3,g1,g12,RotMatrix)
 call SampleBZ(nMomentaComponents,nMomentaFlattened,MomentaValues,numkPostProc,g1,g12)
-
-! Moire lattice parameters
-
-t1 = real(ntheta,dp)*a1 + real(ntheta+1,dp)*a2
-t2 = real(-ntheta-1,dp)*a1 + real(2*ntheta+1,dp)*a2
-t3 = t2 - t1
-
-call WignerSeitzCell(Coords,t1,t2,cs,sn)
-
-do n=1,ndim
-    Coords(n,:) = matmul(RotMatrix,Coords(n,1:2))
-end do
-
-t1 = matmul(RotMatrix,t1)
-t2 = matmul(RotMatrix,t2)
-t3 = t2 - t1
-
-if(nrelax.EQ.1)then
-    if(nlayers.EQ.2)then
-        call LatticeRelaxationKoshino(Coords,g1,g12)
-    endif
-endif
-if(nrelax.EQ.2)then
-    if(nlayers.EQ.2)then
-        call LatticeRelaxationCarr(Coords,g1,g12)
-    endif
-endif
 
 tn(1,:) = t1
 tn(2,:) = t2
@@ -132,41 +97,10 @@ call LongRangeInteraction(LongRange,Coords,ndim,t1,t2)
 !! Read the Fock matrix from disk
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-call InitParameters()
-
-write(*,*) 'parameters', parametersIn
-
-do nspin = 1, numS
-     if(numS.EQ.1)then
-         write(filename,'(A9,A10,I0,A210)') dirFock,'Fock-nspin',1,parametersIn
-     else
-         write(filename,'(A9,A10,I0,A210)') dirFock,'Fock-nspin',nspin,parametersIn
-     endif
-
-     open(12, file=filename, form='unformatted', status='old', access='direct', recl=dp*2)
-     rcc = 0_dp
-     do i = 1, ndim
-         do j = 1, i-1
-             rcc = rcc + 1_dp
-             read(12,rec=rcc) zinput
-             zFock(i,j,1,nspin) = zinput
-             zFock(j,i,1,nspin) = conjg(zinput)
-         end do
-         rcc = rcc + 1_dp
-         read(12,rec=rcc) zinput
-         zFock(i,i,1,nspin) = zinput
-     end do
-     do m = 2, numNeighborCells
-         do i = 1, ndim
-             do j = 1, ndim
-                 rcc = rcc + 1_dp
-                 read(12,rec=rcc) zinput
-                 zFock(i,j,m,nspin) = zinput
-             end do
-         end do
-     end do
-     close(12)
-end do
+call InputParameters(inputSuffix)
+write(*,*) 'parameters', trim(inputSuffix)
+call ReadFock(zFock,numNeighborCells,inputSuffix)
+write(outputSuffix,'(A,I0,A)') '-numkPostProc',numkPostProc,trim(inputSuffix)
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !! Hartree and Hubbard potential of the Fock matrix, as in Main
@@ -210,7 +144,7 @@ deallocate(LongRange)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 FermiEnergy = 0.0_dp
-write(filename,'(A,A,A)') trim(dir),'Mu',trim(parametersIn)
+write(filename,'(A,A,A)') trim(dir),'Mu',trim(inputSuffix)
 open(13, file=filename, status='old', iostat=my_iostat)
 if(my_iostat.EQ.0)then
     do
@@ -319,10 +253,10 @@ enddo
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 do nspin=1,numS
-    write(filename,'(A,A,I0,A)') trim(dir),'Bands-nspin',nspin,trim(parametersOut)
+    write(filename,'(A,A,I0,A)') trim(dir),'Bands-nspin',nspin,trim(outputSuffix)
     open(99,file=filename,status='replace')
     call PlotBands(Bands(:,:,nspin),FermiEnergy,nMomentaFlattened,numb,numkPostProc,NkB,g1,g12)
     close(99)
 enddo
 
-end program bandstructure
+end program compute_plotBands
