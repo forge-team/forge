@@ -2,7 +2,7 @@ program check_screening
 use Setup, only: dp, ndim, numI, numS, numC, alpha, alphaH, U, Delta, fphase, nscreen
 use Geometry, only: NumberNeighborCells, OrderNeighborCells
 use HartreeFock, only: LongRangeInteraction, HamiltonianHartreeFock
-use Hamiltonian, only: longRange, ComplexHk_MF, vxy12I_MF
+use Spectral, only: longRange, ComplexHk_MF, vxy12I_MF
 use PostProcessingInput, only: BuildGeometry, ValidateResponseModel
 implicit none
 integer(dp) :: nc, i, j, m, point, axis

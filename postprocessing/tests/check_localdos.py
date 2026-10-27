@@ -39,16 +39,16 @@ for name, value in dict(dp=8, ntheta=1, numS=1, numI=1, numC=1, numk=3, numb=4, 
     assert count == 1, name
 (BUILD / 'Setup.f90').write_text(setup)
 sources = [POST / 'LapackRoutines.f90', BUILD / 'Setup.f90', REPO / 'TightBinding.f90',
-           REPO / 'Geometry.f90', REPO / 'HartreeFock.f90', POST / 'Hamiltonian.f90', POST / 'PostProcessingInput.f90']
+           REPO / 'Geometry.f90', REPO / 'HartreeFock.f90', REPO / 'Spectral.f90', POST / 'PostProcessingInput.f90']
 objects = [p.stem + '.o' for p in sources]
 run(['gfortran', *FLAGS, '-c', *map(str, sources)], 'compile_modules')
 driver = (POST / 'compute_localDos.f90').read_text()
-kernels = driver.split('! BEGIN imported local-DOS kernels\n')[1].split('! END imported local-DOS kernels')[0]
-(BUILD / 'kernels.f90').write_text('module kernels\nuse Setup, only: dp\nuse Hamiltonian, only: sortF\n'
+kernels = (REPO / 'Spectral.f90').read_text().split('! BEGIN imported local-DOS kernels\n')[1].split('! END imported local-DOS kernels')[0]
+(BUILD / 'kernels.f90').write_text('module kernels\nuse Setup, only: dp\nuse Spectral, only: sortF\n'
                                   'implicit none\ncontains\n' + kernels + '\nend module\n')
 (BUILD / 'check_kernels.f90').write_text('''program check_kernels
 use Setup, only: dp
-use Hamiltonian, only: dosCB_S, dosVB_S
+use Spectral, only: dosCB_S, dosVB_S
 use kernels
 implicit none
 integer(dp), parameter :: bins=501, rate=1000, shift=201

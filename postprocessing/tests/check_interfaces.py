@@ -129,7 +129,7 @@ end program
 # Use actual adapted driver prologues, including their own declarations,
 # allocations, geometry call, filename selection and ReadFock call.
 folder = BUILD / 'dp8_s1_I1_relax0'
-run(['gfortran', *FLAGS, '-c', str(POST / 'Hamiltonian.f90')], folder, 'compile_legacy.log')
+run(['gfortran', *FLAGS, '-c', str(REPO / 'Spectral.f90')], folder, 'compile_legacy.log')
 for source in POST.glob('Compute_*.f90'):
     if 'KramersKronig' in source.name:
         continue  # This program reads conductivity, not geometry or Fock.
@@ -143,7 +143,7 @@ if(abs(coord(1,3)+tz/2)>1e-12_dp) error stop 'layer geometry changed'
 print *, 'actual driver prologue PASS'
 end program
 '''
-    compile_program(folder, source.stem, prefix, ['Hamiltonian.o'])
+    compile_program(folder, source.stem, prefix, ['Spectral.o'])
     run([str(folder / source.stem)], folder, f'{source.stem}.log')
     RESULTS.append(f'{source.stem}: actual geometry/Fock prologue PASS')
 
@@ -188,7 +188,7 @@ for imu in range(1, 41):
     tail = f'1-Mu{imu}-numkPlot6-nspacing1000{suffix}'
     (out / ('DiaXY' + tail)).write_text('40 2 0.2 0.4 0.0\n')
     (out / ('ConductivityTot' + tail)).write_text(''.join(f'{(n-2)/1000} 1\n' for n in range(2, 41)))
-compile_program(folder, 'Compute_KramersKronig', (POST / 'Compute_KramersKronig.f90').read_text(), ['Hamiltonian.o'])
+compile_program(folder, 'Compute_KramersKronig', (POST / 'Compute_KramersKronig.f90').read_text(), ['Spectral.o'])
 run([str(folder / 'Compute_KramersKronig')], folder, 'Compute_KramersKronig.log')
 for imu in range(1, 41):
     result = out / f'RealTot1-Mu{imu}-numkPlot6-nspacing1000-nstep1-nstepI1-nKK4{suffix}'

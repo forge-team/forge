@@ -33,7 +33,7 @@ for case in cases:
         assert count == 1, key
     (folder / 'Setup.f90').write_text(setup)
     sources = [POST/'LapackRoutines.f90', folder/'Setup.f90', REPO/'TightBinding.f90',
-               REPO/'Geometry.f90', REPO/'HartreeFock.f90', POST/'Hamiltonian.f90',
+               REPO/'Geometry.f90', REPO/'HartreeFock.f90', REPO / 'Spectral.f90',
                POST/'PostProcessingInput.f90', POST/'tests/check_screening.f90']
     compile_result = subprocess.run(['gfortran', *FLAGS, '-o', 'check_screening', *map(str,sources), *LIBS],
                                     cwd=folder, env=ENV, text=True, capture_output=True)
