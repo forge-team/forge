@@ -1292,3 +1292,1500 @@ end function fv
 
 
 end module HartreeFock
+
+
+! Postprocessing compatibility namespace (shares the dev physical settings).
+! Compatibility routines grouped by the same responsibilities as FORGE dev.
+module ResponseHartreeFock
+use ResponseSetup
+use lapack_routines
+use HartreeFock, only: fv, LongRangeInteraction
+use ResponseTightBinding
+implicit none
+contains
+
+
+subroutine longRange(fLongRange,coord,ndim,t1,t2)
+integer(dp), intent(in) :: ndim
+real(dp), intent(in) :: coord(ndim,3), t1(2), t2(2)
+real(dp), intent(inout) :: fLongRange(ndim,ndim)
+call LongRangeInteraction(fLongRange,coord,ndim,t1,t2)
+end subroutine longRange
+!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!
+
+
+!c!c!cC
+!c!c!cC
+!c!c!cC
+
+subroutine ComplexH0_MF(zh,coord,potential,alpha,zfock,ndim)
+
+integer(dp), intent(in)    :: ndim
+
+real(dp)   , intent(in)    :: coord(ndim,3), potential(ndim),alpha
+complex(dp) , intent(in)   :: zfock(ndim,ndim)
+complex(dp), intent(out) :: zh(ndim,ndim)
+
+integer(dp) :: i, j, nt
+real(dp)    :: rij, coord_diff
+complex(dp) :: zi_vk_tn,zphase
+
+
+zh(:,:) = cmplx(0.0_dp,0.0_dp,dp)
+
+ do i = 1 , ndim
+   zh(i,i)=potential(i)
+   do j = 1 , i
+
+   rij = norm2(coord(i,:)-coord(j,:))
+
+   coord_diff = (coord(i,3)-coord(j,3))**2
+
+   zh(i,j)=zh(i,j)-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j))
+
+
+   if(coord_diff < deltaR .and. rij > deltaR) then
+     zh(i,j) = zh(i,j)+ft(rij)
+   endif
+
+   if(coord_diff > deltaR) then
+      zh(i,j) = zh(i,j) + ftperp(rij)
+   endif
+
+   end do
+ end do
+
+
+end subroutine ComplexH0_MF
+
+!c!c!cC
+!c!c!cC
+!c!c!cC
+
+subroutine ComplexHk_MF_UnitCell(zh,coord,potential,alpha,zfock,ind_j,ind_l,ndim,ind,vk,tn)
+
+integer(dp), intent(in)    :: ndim, ind
+
+integer(dp), intent(in)    :: ind_j(ind), ind_l(ind)
+real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3),potential(ndim),alpha
+complex(dp) , intent(in)   :: zfock(ndim,ndim,ind)
+complex(dp), intent(out) :: zh(ndim,ndim)
+
+integer(dp) :: i, j, nt, icount, n1, n2
+real(dp)    :: rij, coord_diff
+complex(dp) :: zi_vk_tn,zsum,zphase
+
+do i=1,ind
+! write(*,*) i,vk(1),vk(2)
+! write(*,*) i,zfock(345,140,i)
+! write(*,*) i,conjg(zfock(345,140,i))
+enddo
+
+
+zh(:,:) = cmplx(0.0_dp,0.0_dp,dp)
+
+ do i = 1 , ndim
+   zh(i,i)=zh(i,i)+potential(i)
+   do j = 1 , i
+
+     zphase=exp(cmplx(0.0_dp,-dot_product(vk,coord(i,1:2)-coord(j,1:2))*fphase,dp))
+
+rij = norm2(coord(i,:)-coord(j,:))
+
+coord_diff = (coord(i,3)-coord(j,3))**2
+
+zh(i,j)=zh(i,j)-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase
+
+
+if(coord_diff < deltaR .and. rij > deltaR) then
+  zh(i,j) = zh(i,j)+ft(rij)*zphase
+endif
+
+if(coord_diff > deltaR) then
+   zh(i,j) = zh(i,j) + ftperp(rij)*zphase
+endif
+
+
+!!!!!! Coupling to adjacent Wigner-Seitz cell with tn
+     do nt = 1 , 3
+       rij = norm2(coord(i,:)-[coord(j,1:2)-tn(:,nt),coord(j,3)])
+
+       zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)))
+
+       if(coord_diff < deltaR)then
+         zh(i,j)=zh(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase
+       else
+         zh(i,j)=zh(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase
+       endif
+
+!!!!!! Coupling to adjacent Wigner-Seitz cell with tn
+
+  rij = norm2(coord(i,:)-[coord(j,1:2)+tn(:,nt),coord(j,3)])
+
+  zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,tn(:,nt)),dp)
+
+  if(coord_diff < deltaR)then
+    zh(i,j)=zh(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase
+  else
+    zh(i,j)=zh(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase
+  endif
+
+     end do
+
+
+   zsum=cmplx(0.0_dp,0.0_dp,dp)
+   do icount=2,ind
+   n1=ind_j(icount)
+   n2=ind_l(icount)
+
+   zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])
+
+   zsum=zsum-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)
+
+   rij = norm2(coord(j,:)-[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])
+
+   zsum=zsum-alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)
+
+   enddo
+
+   zh(i,j)=zh(i,j)+zsum*zphase
+
+   end do
+ end do
+
+ do i=1,ndim/4
+ zh(i,i)=zh(i,i)+mass1
+ j=i+ndim/4
+ zh(j,j)=zh(j,j)-mass1
+ enddo
+
+
+end subroutine ComplexHk_MF_UnitCell
+
+!c!c!cC
+!c!c!cC
+!c!c!cC
+
+subroutine ComplexHk_MF(zh,coord,potential,alpha,zfock,ind_j,ind_l,ndim,ind,vk,tn)
+
+integer(dp), intent(in)    :: ndim, ind
+
+integer(dp), intent(in)    :: ind_j(ind), ind_l(ind)
+real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3),potential(ndim),alpha
+complex(dp) , intent(in)   :: zfock(ndim,ndim,ind)
+complex(dp), intent(out) :: zh(ndim,ndim)
+
+integer(dp) :: i, j, nt, icount, n1, n2
+real(dp)    :: rij, coord_diff
+complex(dp) :: zi_vk_tn,zsum,zphase
+
+do i=1,ind
+! write(*,*) i,vk(1),vk(2)
+! write(*,*) i,zfock(345,140,i)
+! write(*,*) i,conjg(zfock(345,140,i))
+enddo
+
+
+zh(:,:) = cmplx(0.0_dp,0.0_dp,dp)
+
+ do i = 1 , ndim
+   zh(i,i)=potential(i)
+   do j = 1 , i
+
+     zphase=exp(cmplx(0.0_dp,-dot_product(vk,coord(i,1:2)-coord(j,1:2))*fphase,dp))
+
+rij = norm2(coord(i,:)-coord(j,:))
+
+coord_diff = (coord(i,3)-coord(j,3))**2
+
+zh(i,j)=zh(i,j)-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase
+
+
+if(coord_diff < deltaR .and. rij > deltaR) then
+  zh(i,j) = zh(i,j)+ft(rij)*zphase
+endif
+
+if(coord_diff > deltaR) then
+   zh(i,j) = zh(i,j) + ftperp(rij)*zphase
+endif
+
+!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!
+
+     do icount=2,ind
+     n1=ind_j(icount)
+     n2=ind_l(icount)
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])
+
+   zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+   if(coord_diff < deltaR)then
+      zh(i,j)=zh(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase
+   else
+      zh(i,j)=zh(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase
+   endif
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)+n1*tn(:,1)+n2*tn(:,2),coord(j,3)])
+
+   zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+   if(coord_diff < deltaR)then
+      zh(i,j)=zh(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase
+   else
+      zh(i,j)=zh(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase
+   endif
+
+   enddo
+
+!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!
+
+   zsum=cmplx(0.0_dp,0.0_dp,dp)
+   do icount=2,ind
+   n1=ind_j(icount)
+   n2=ind_l(icount)
+
+   zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])
+
+   zsum=zsum-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)
+
+   rij = norm2(coord(j,:)-[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])
+
+   zsum=zsum-alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)
+
+   enddo
+
+   zh(i,j)=zh(i,j)+zsum*zphase
+
+   end do
+ end do
+
+ !do i=1,ndim/4
+ !zh(i,i)=zh(i,i)+mass1
+ !j=i+ndim/4
+ !zh(j,j)=zh(j,j)-mass1
+ !ssenddo
+
+
+
+end subroutine ComplexHk_MF
+
+!c!c!cC
+!c!c!cC
+!c!c!cC
+
+subroutine vxy_MF(zvxy,coord,alpha,zfock,ind_j,ind_l,ndim,ind,vk,tn,nxy)
+
+integer(dp), intent(in)    :: ndim, ind, nxy
+
+integer(dp), intent(in)    :: ind_j(ind), ind_l(ind)
+real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3),alpha
+complex(dp) , intent(in)   :: zfock(ndim,ndim,ind)
+complex(dp), intent(out) :: zvxy(ndim,ndim)
+
+integer(dp) :: i, j, nt, icount, n1, n2
+real(dp)    :: rij, rxy, coord_diff
+complex(dp) :: zi_vk_tn,zsum,zphase
+
+
+ zvxy = cmplx(0.0_dp,0.0_dp,dp)
+
+ do i = 1 , ndim
+   do j = i , ndim
+
+     zphase=exp(cmplx(0.0_dp,-dot_product(vk,coord(i,1:2)-coord(j,1:2))*fphase,dp))
+
+     rij = norm2(coord(i,:)-coord(j,:))
+     rxy = coord(i,nxy)-coord(j,nxy)
+
+     coord_diff = (coord(i,3)-coord(j,3))**2
+
+     zvxy(i,j)=zvxy(i,j)-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase*cmplx(0.0_dp,rxy,dp)
+
+
+if(coord_diff < deltaR .and. rij > deltaR) then
+  zvxy(i,j)=zvxy(i,j)+ft(rij)*zphase*cmplx(0.0_dp,rxy,dp)
+endif
+
+if(coord_diff > deltaR) then
+   zvxy(i,j)=zvxy(i,j) + ftperp(rij)*zphase*cmplx(0.0_dp,rxy,dp)
+endif
+
+!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!
+
+     do icount=2,ind
+     n1=ind_j(icount)
+     n2=ind_l(icount)
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])
+   rxy=coord(i,nxy)-coord(j,nxy)+n1*tn(nxy,1)+n2*tn(nxy,2)
+   !rxy = coord(i,nxy)-coord(j,nxy)
+
+   zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+   if(coord_diff < deltaR)then
+      zvxy(i,j)=zvxy(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*cmplx(0.0_dp,rxy,dp)
+   else
+      zvxy(i,j)=zvxy(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase*cmplx(0.0_dp,rxy,dp)
+   endif
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)+n1*tn(:,1)+n2*tn(:,2),coord(j,3)])
+   rxy=coord(i,nxy)-coord(j,nxy)-n1*tn(nxy,1)-n2*tn(nxy,2)
+
+   zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+   if(coord_diff < deltaR)then
+      zvxy(i,j)=zvxy(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*cmplx(0.0_dp,rxy,dp)
+   else
+      zvxy(i,j)=zvxy(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase*cmplx(0.0_dp,rxy,dp)
+   endif
+
+   enddo
+
+!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!
+
+   zsum=cmplx(0.0_dp,0.0_dp,dp)
+   do icount=2,ind
+   n1=ind_j(icount)
+   n2=ind_l(icount)
+
+   zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])
+   rxy=coord(i,nxy)-coord(j,nxy)+n1*tn(nxy,1)+n2*tn(nxy,2)
+
+   zsum=zsum-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+
+   rij = norm2(coord(j,:)-[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])
+   rxy=coord(j,nxy)-coord(i,nxy)+n1*tn(nxy,1)+n2*tn(nxy,2)
+
+   zsum=zsum-alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+
+   enddo
+
+   zvxy(i,j)=zvxy(i,j)+zsum*zphase
+
+   end do
+ end do
+
+
+
+end subroutine vxy_MF
+
+!c!c!cC
+!c!c!cC
+!c!c!cC
+
+subroutine vxy12I_MF(zvxy1,zvxy2,zvxyI,coord,alpha,zfock,ind_j,ind_l,ndim,ind,vk,tn,nxy)
+
+integer(dp), intent(in)    :: ndim, ind, nxy
+
+integer(dp), intent(in)    :: ind_j(ind), ind_l(ind)
+real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3),alpha
+complex(dp) , intent(in)   :: zfock(ndim,ndim,ind)
+complex(dp), intent(out) :: zvxy1(:,:),zvxy2(:,:),zvxyI(:,:)
+
+integer(dp) :: i, j, nt, icount, n1, n2
+real(dp)    :: rij, rxy, coord_diff
+complex(dp) :: zi_vk_tn,zsum1,zsum2,zsumI,zphase
+
+
+ zvxy1 = cmplx(0.0_dp,0.0_dp,dp)
+ zvxy2 = cmplx(0.0_dp,0.0_dp,dp)
+ zvxyI = cmplx(0.0_dp,0.0_dp,dp)
+
+
+ do i = 1 , ndim
+   do j = i , ndim
+
+     zphase=exp(cmplx(0.0_dp,-dot_product(vk,coord(i,1:2)-coord(j,1:2))*fphase,dp))
+
+     rij = norm2(coord(i,:)-coord(j,:))
+     rxy = coord(i,nxy)-coord(j,nxy)
+
+
+if(coord(i,3)<deltaR .and. coord(j,3)<deltaR .and. rij>deltaR) then
+  zvxy1(i,j)=-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase*cmplx(0.0_dp,rxy,dp)
+  zvxy1(i,j)=zvxy1(i,j)+ft(rij)*zphase*cmplx(0.0_dp,rxy,dp)
+else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR .and. rij>deltaR) then
+  zvxy2(i,j)=-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase*cmplx(0.0_dp,rxy,dp)
+  zvxy2(i,j)=zvxy2(i,j)+ft(rij)*zphase*cmplx(0.0_dp,rxy,dp)
+else if(coord(i,3).NE.coord(j,3)) then
+  zvxyI(i,j)=-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase*cmplx(0.0_dp,rxy,dp)
+  zvxyI(i,j)=zvxyI(i,j) + ftperp(rij)*zphase*cmplx(0.0_dp,rxy,dp)
+endif
+
+!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!
+
+     do icount=2,ind
+     n1=ind_j(icount)
+     n2=ind_l(icount)
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])
+   rxy=coord(i,nxy)-coord(j,nxy)+n1*tn(nxy,1)+n2*tn(nxy,2)
+
+   zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+      zvxy1(i,j)=zvxy1(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*cmplx(0.0_dp,rxy,dp)
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+      zvxy2(i,j)=zvxy2(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*cmplx(0.0_dp,rxy,dp)
+   else if(coord(i,3).NE.coord(j,3)) then
+      zvxyI(i,j)=zvxyI(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase*cmplx(0.0_dp,rxy,dp)
+   endif
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)+n1*tn(:,1)+n2*tn(:,2),coord(j,3)])
+   rxy=coord(i,nxy)-coord(j,nxy)-n1*tn(nxy,1)-n2*tn(nxy,2)
+
+   zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+      zvxy1(i,j)=zvxy1(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*cmplx(0.0_dp,rxy,dp)
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+      zvxy2(i,j)=zvxy2(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*cmplx(0.0_dp,rxy,dp)
+   else if(coord(i,3).NE.coord(j,3)) then
+      zvxyI(i,j)=zvxyI(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase*cmplx(0.0_dp,rxy,dp)
+   endif
+
+   enddo
+
+!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!
+
+   zsum1=cmplx(0.0_dp,0.0_dp,dp)
+   zsum2=cmplx(0.0_dp,0.0_dp,dp)
+   zsumI=cmplx(0.0_dp,0.0_dp,dp)
+   do icount=2,ind
+   n1=ind_j(icount)
+   n2=ind_l(icount)
+
+   zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])
+   rxy=coord(i,nxy)-coord(j,nxy)+n1*tn(nxy,1)+n2*tn(nxy,2)
+
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+      zsum1=zsum1-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+      zsum2=zsum2-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+   else if(coord(i,3).NE.coord(j,3)) then
+      zsumI=zsumI-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+   endif
+
+   rij = norm2(coord(j,:)-[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])
+   rxy=coord(j,nxy)-coord(i,nxy)+n1*tn(nxy,1)+n2*tn(nxy,2)
+
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+   zsum1=zsum1+alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+   zsum2=zsum2+alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+   else if(coord(i,3).NE.coord(j,3)) then
+   zsumI=zsumI+alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+   endif
+
+   enddo
+
+   zvxy1(i,j)=zvxy1(i,j)+zsum1*zphase
+   zvxy2(i,j)=zvxy2(i,j)+zsum2*zphase
+   zvxyI(i,j)=zvxyI(i,j)+zsumI*zphase
+
+   end do
+ end do
+
+
+
+end subroutine vxy12I_MF
+
+!c!c!cC
+!c!c!cC
+!c!c!cC
+
+subroutine vxy12_MF(zvxy,coord,alpha,zfock,ind_j,ind_l,ndim,ind,vk,tn,nxy)
+
+integer(dp), intent(in)    :: ndim, ind, nxy
+
+integer(dp), intent(in)    :: ind_j(ind), ind_l(ind)
+real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3),alpha
+complex(dp) , intent(in)   :: zfock(ndim,ndim,ind)
+complex(dp), intent(out) :: zvxy(:,:)
+
+integer(dp) :: i, j, nt, icount, n1, n2
+real(dp)    :: rij, rxy, coord_diff
+complex(dp) :: zi_vk_tn,zsum1,zsum2,zsumI,zphase
+
+
+ zvxy = cmplx(0.0_dp,0.0_dp,dp)
+
+
+ do i = 1 , ndim
+   do j = i , ndim
+
+     zphase=exp(cmplx(0.0_dp,-dot_product(vk,coord(i,1:2)-coord(j,1:2))*fphase,dp))
+
+     rij = norm2(coord(i,:)-coord(j,:))
+     rxy = coord(i,nxy)-coord(j,nxy)
+
+
+if(coord(i,3)<deltaR .and. coord(j,3)<deltaR .and. rij>deltaR) then
+  zvxy(i,j)=-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase*cmplx(0.0_dp,rxy,dp)
+  zvxy(i,j)=zvxy(i,j)+ft(rij)*zphase*cmplx(0.0_dp,rxy,dp)
+else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR .and. rij>deltaR) then
+  zvxy(i,j)=-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase*cmplx(0.0_dp,rxy,dp)
+  zvxy(i,j)=zvxy(i,j)+ft(rij)*zphase*cmplx(0.0_dp,rxy,dp)
+else if(coord(i,3).NE.coord(j,3)) then
+  zvxy(i,j)=-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase*cmplx(0.0_dp,rxy,dp)
+  zvxy(i,j)=zvxy(i,j) + ftperp(rij)*zphase*cmplx(0.0_dp,rxy,dp)
+endif
+
+!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!
+
+     do icount=2,ind
+     n1=ind_j(icount)
+     n2=ind_l(icount)
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])
+   rxy=coord(i,nxy)-coord(j,nxy)+n1*tn(nxy,1)+n2*tn(nxy,2)
+
+   zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+      zvxy(i,j)=zvxy(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*cmplx(0.0_dp,rxy,dp)
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+      zvxy(i,j)=zvxy(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*cmplx(0.0_dp,rxy,dp)
+   else if(coord(i,3).NE.coord(j,3)) then
+      zvxy(i,j)=zvxy(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase*cmplx(0.0_dp,rxy,dp)
+   endif
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)+n1*tn(:,1)+n2*tn(:,2),coord(j,3)])
+   rxy=coord(i,nxy)-coord(j,nxy)-n1*tn(nxy,1)-n2*tn(nxy,2)
+
+   zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+      zvxy(i,j)=zvxy(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*cmplx(0.0_dp,rxy,dp)
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+      zvxy(i,j)=zvxy(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*cmplx(0.0_dp,rxy,dp)
+   else if(coord(i,3).NE.coord(j,3)) then
+      zvxy(i,j)=zvxy(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase*cmplx(0.0_dp,rxy,dp)
+   endif
+
+   enddo
+
+!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!
+
+   zsum1=cmplx(0.0_dp,0.0_dp,dp)
+   zsum2=cmplx(0.0_dp,0.0_dp,dp)
+   zsumI=cmplx(0.0_dp,0.0_dp,dp)
+   do icount=2,ind
+   n1=ind_j(icount)
+   n2=ind_l(icount)
+
+   zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])
+   rxy=coord(i,nxy)-coord(j,nxy)+n1*tn(nxy,1)+n2*tn(nxy,2)
+
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+      zsum1=zsum1-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+      zsum2=zsum2-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+   else if(coord(i,3).NE.coord(j,3)) then
+      zsumI=zsumI-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+   endif
+
+   rij = norm2(coord(j,:)-[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])
+   rxy=coord(j,nxy)-coord(i,nxy)+n1*tn(nxy,1)+n2*tn(nxy,2)
+
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+   zsum1=zsum1+alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+   zsum2=zsum2+alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+   else if(coord(i,3).NE.coord(j,3)) then
+   zsumI=zsumI+alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)*cmplx(0.0_dp,rxy,dp)
+   endif
+
+   enddo
+
+   zvxy(i,j)=zvxy(i,j)+zsum1*zphase+zsum2*zphase+zsumI*zphase
+
+   end do
+ end do
+
+
+
+end subroutine vxy12_MF
+
+
+
+!c!c!cC
+!c!c!cC
+!c!c!cC
+
+subroutine ComplexH0_Hartree(zh,coord,potential,ndim)
+
+integer(dp), intent(in)    :: ndim
+
+real(dp)   , intent(in)    :: coord(ndim,3), potential(ndim)
+complex(dp), intent(out) :: zh(ndim,ndim)
+
+integer(dp) :: i, j, nt
+real(dp)    :: rij, coord_diff
+complex(dp) :: zi_vk_tn
+
+
+zh(:,:) = cmplx(0.0_dp,0.0_dp,dp)
+
+ do i = 1 , ndim
+   zh(i,i)=potential(i)
+   do j = 1 , ndim
+
+   rij = norm2(coord(i,:)-coord(j,:))
+
+   coord_diff = (coord(i,3)-coord(j,3))**2
+
+   if(coord_diff < deltaR .and. rij > deltaR) then
+     zh(i,j) = zh(i,j)+ft(rij)
+   endif
+
+   if(coord_diff > deltaR) then
+      zh(i,j) = zh(i,j) + ftperp(rij)
+   endif
+
+
+   end do
+ end do
+
+end subroutine ComplexH0_Hartree
+
+!c!c!cC
+!c!c!cC
+!c!c!cC
+
+subroutine ComplexHk_Hartree(zh,coord,ndim,vk,tn)
+
+integer(dp), intent(in)    :: ndim
+
+real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3)
+complex(dp), intent(inout) :: zh(ndim,ndim)
+
+integer(dp) :: i, j, nt, icount, n1, n2
+real(dp)    :: rij, coord_diff
+complex(dp) :: zi_vk_tn
+
+
+zh(:,:) = cmplx(0.0_dp,0.0_dp,dp)
+
+ do i = 1 , ndim
+   do j = 1 , ndim
+
+     coord_diff = (coord(i,3)-coord(j,3))**2
+
+!!!!!! Coupling to adjacent Wigner-Seitz cell with tn
+     do nt = 1 , 3
+       rij = norm2(coord(i,:)-[coord(j,1:2)-tn(:,nt),coord(j,3)])
+
+       zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+
+       if(coord_diff < deltaR)then
+         zh(i,j)=zh(i,j)+ft(rij)*exp( zi_vk_tn)
+         zh(j,i)=zh(j,i)+ft(rij)*exp(-zi_vk_tn)
+       else
+         zh(i,j)=zh(i,j)+ftperp(rij)*exp( zi_vk_tn)
+         zh(j,i)=zh(j,i)+ftperp(rij)*exp(-zi_vk_tn)
+       endif
+
+     end do
+
+   end do
+ end do
+
+end subroutine ComplexHk_Hartree
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!%
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+subroutine ComplexH0_Hartree_sym(zh,coord,potential,ndim,tn)
+
+ integer(dp), intent(in)    :: ndim
+ real(dp)   , intent(in)    :: tn(2,3), potential(ndim)
+ real(dp)   , intent(in) :: coord(ndim,3)
+ complex(dp), intent(inout) :: zh(ndim,ndim)
+
+ integer(dp) :: i, j, nt, l1,l2
+ real(dp)    :: rij, coord_diff
+ real(dp)    :: coord_temp(ndim,3)
+ real(dp)     :: coord_sym1(3,3)
+ real(dp)     :: coord_sym2(3,3)
+
+
+zh(:,:) = cmplx(0.0_dp,0.0_dp,dp)
+
+coord_temp(:,:)=coord(:,:)
+
+coord_sym1(1,1)=(tn(1,2)+tn(1,3))/3.0_dp
+coord_sym1(1,2)=(tn(2,2)+tn(2,3))/3.0_dp
+coord_sym1(1,3)=coord_temp(ndim/2,3)
+
+coord_sym1(2,1)=(tn(1,1)-tn(1,3))/3.0_dp
+coord_sym1(2,2)=(tn(2,1)-tn(2,3))/3.0_dp
+coord_sym1(2,3)=coord_temp(ndim/2,3)
+
+coord_sym1(3,1)=-(tn(1,1)+tn(1,2))/3.0_dp
+coord_sym1(3,2)=-(tn(2,1)+tn(2,2))/3.0_dp
+coord_sym1(3,3)=coord_temp(ndim/2,3)
+
+coord_sym2(1,1)=(tn(1,1)+tn(1,2))/3.0_dp
+coord_sym2(1,2)=(tn(2,1)+tn(2,2))/3.0_dp
+coord_sym2(1,3)=coord_temp(ndim,3)
+
+coord_sym2(2,1)=(tn(1,3)-tn(1,1))/3.0_dp
+coord_sym2(2,2)=(tn(2,3)-tn(2,1))/3.0_dp
+coord_sym2(2,3)=coord_temp(ndim,3)
+
+coord_sym2(3,1)=-(tn(1,3)+tn(1,2))/3.0_dp
+coord_sym2(3,2)=-(tn(2,3)+tn(2,2))/3.0_dp
+coord_sym2(3,3)=coord_temp(ndim,3)
+
+
+do l1=1,3
+do l2=1,3
+
+coord_temp(ndim/2,:)=coord_sym1(l1,:)
+coord_temp(ndim,:)=coord_sym2(l2,:)
+
+
+ do i = ndim/2,ndim,ndim/2
+   do j = 1 , ndim
+
+     rij = norm2(coord_temp(i,:)-coord_temp(j,:))
+
+     coord_diff = (coord_temp(i,3)-coord_temp(j,3))**2
+
+     if(coord_diff < deltaR) then
+       zh(i,j) = zh(i,j)+ft(rij)
+     else
+        zh(i,j) = zh(i,j)+ftperp(rij)
+     endif
+
+   end do
+ end do
+
+ do i = 1,ndim/2-1
+    do j = ndim/2, ndim,ndim/2
+
+      rij = norm2(coord_temp(i,:)-coord_temp(j,:))
+
+      coord_diff = (coord_temp(i,3)-coord_temp(j,3))**2
+
+      if(coord_diff < deltaR) then
+        zh(i,j) = zh(i,j)+ft(rij)
+      else
+         zh(i,j) = zh(i,j)+ftperp(rij)
+      endif
+
+    end do
+  end do
+
+  do i = ndim/2+1,ndim-1
+     do j = ndim/2, ndim,ndim/2
+
+       rij = norm2(coord_temp(i,:)-coord_temp(j,:))
+
+       coord_diff = (coord_temp(i,3)-coord_temp(j,3))**2
+
+       if(coord_diff < deltaR) then
+         zh(i,j) = zh(i,j)+ft(rij)
+       else
+          zh(i,j) = zh(i,j)+ftperp(rij)
+       endif
+
+     end do
+   end do
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+enddo
+enddo
+
+zh(:,:)=zh(:,:)/cmplx(9.0_dp,0.0_dp,dp)
+
+!c!c!cC
+!c!c!cC
+!c!c!cC
+
+do i = 1 , ndim
+   zh(i,i)=zh(i,i)+potential(i)
+enddo
+
+!!!!!!!!!!! Layer 1
+
+ do i = 1 , ndim/2-1
+   do j = 1 , ndim/2-1
+
+     rij = norm2(coord_temp(i,:)-coord_temp(j,:))
+
+     zh(i,j) = zh(i,j)+ft(rij)
+
+   end do
+ end do
+
+!!!!!!!!!!! Layer 2
+
+ do i = ndim/2+1,ndim-1
+   do j = ndim/2+1,ndim-1
+
+     rij = norm2(coord_temp(i,:)-coord_temp(j,:))
+
+     zh(i,j) = zh(i,j)+ft(rij)
+
+   end do
+ end do
+
+!!!!!!!!!!! Coupling Layer 1 to Layer 2
+
+do i = 1 , ndim/2-1
+   do j = ndim/2+1 , ndim-1
+
+     rij = norm2(coord_temp(i,:)-coord_temp(j,:))
+
+     zh(i,j) = zh(i,j)+ftperp(rij)
+
+   end do
+ end do
+
+!!!!!!!!!!! Coupling Layer 2 to Layer 1
+
+ do i = ndim/2+1 , ndim-1
+    do j = 1 , ndim/2-1
+
+      rij = norm2(coord_temp(i,:)-coord_temp(j,:))
+
+      zh(i,j) = zh(i,j)+ftperp(rij)
+
+    end do
+  end do
+
+
+end subroutine ComplexH0_Hartree_sym
+
+!c!c!cC
+!c!c!cC
+!c!c!cC
+
+subroutine ComplexHk_Hartree_sym(zh,coord,ndim,vk,tn)
+
+ integer(dp), intent(in)    :: ndim
+ real(dp)   , intent(in)    :: tn(2,3), vk(2)
+ real(dp)   , intent(in) :: coord(ndim,3)
+ complex(dp), intent(inout) :: zh(ndim,ndim)
+
+ integer(dp) :: i, j, nt, l1,l2
+ real(dp)    :: rij, coord_diff
+ real(dp)     :: coord_sym1(3,3)
+ real(dp)     :: coord_sym2(3,3)
+ real(dp)     :: coord_temp(ndim,3)
+ complex(dp) :: zi_vk_tn
+
+
+zh(:,:) = cmplx(0.0_dp,0.0_dp,dp)
+
+coord_temp(:,:)=coord(:,:)
+
+coord_sym1(1,1)=(tn(1,2)+tn(1,3))/3.0_dp
+coord_sym1(1,2)=(tn(2,2)+tn(2,3))/3.0_dp
+coord_sym1(1,3)=coord_temp(ndim/2,3)
+
+coord_sym1(2,1)=(tn(1,1)-tn(1,3))/3.0_dp
+coord_sym1(2,2)=(tn(2,1)-tn(2,3))/3.0_dp
+coord_sym1(2,3)=coord_temp(ndim/2,3)
+
+coord_sym1(3,1)=-(tn(1,1)+tn(1,2))/3.0_dp
+coord_sym1(3,2)=-(tn(2,1)+tn(2,2))/3.0_dp
+coord_sym1(3,3)=coord_temp(ndim/2,3)
+
+coord_sym2(1,1)=(tn(1,1)+tn(1,2))/3.0_dp
+coord_sym2(1,2)=(tn(2,1)+tn(2,2))/3.0_dp
+coord_sym2(1,3)=coord_temp(ndim,3)
+
+coord_sym2(2,1)=(tn(1,3)-tn(1,1))/3.0_dp
+coord_sym2(2,2)=(tn(2,3)-tn(2,1))/3.0_dp
+coord_sym2(2,3)=coord_temp(ndim,3)
+
+coord_sym2(3,1)=-(tn(1,3)+tn(1,2))/3.0_dp
+coord_sym2(3,2)=-(tn(2,3)+tn(2,2))/3.0_dp
+coord_sym2(3,3)=coord_temp(ndim,3)
+
+
+do l1=1,3
+do l2=1,3
+
+coord_temp(ndim/2,:)=coord_sym1(l1,:)
+coord_temp(ndim,:)=coord_sym2(l2,:)
+
+
+ do i = ndim/2,ndim,ndim/2
+   do j = 1 , ndim
+
+     coord_diff = (coord_temp(i,3)-coord_temp(j,3))**2
+
+     do nt = 1 , 3
+       rij = norm2(coord_temp(i,:)-[coord_temp(j,1:2)-tn(:,nt),coord_temp(j,3)])
+       zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+       if(coord_diff < deltaR)then
+         zh(i,j)=zh(i,j)+ft(rij)*exp( zi_vk_tn)
+         zh(j,i)=zh(j,i)+ft(rij)*exp(-zi_vk_tn)
+       else
+         zh(i,j)=zh(i,j)+ftperp(rij)*exp( zi_vk_tn)
+         zh(j,i)=zh(j,i)+ftperp(rij)*exp(-zi_vk_tn)
+       endif
+     end do
+
+   end do
+ end do
+
+ do i = 1,ndim/2-1
+    do j = ndim/2, ndim,ndim/2
+
+      coord_diff = (coord_temp(i,3)-coord_temp(j,3))**2
+
+ !!!!!! Coupling to adjacent Wigner-Seitz cell with tn
+      do nt = 1 , 3
+        rij = norm2(coord_temp(i,:)-[coord_temp(j,1:2)-tn(:,nt),coord_temp(j,3)])
+        zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+        if(coord_diff < deltaR)then
+          zh(i,j)=zh(i,j)+ft(rij)*exp( zi_vk_tn)
+          zh(j,i)=zh(j,i)+ft(rij)*exp(-zi_vk_tn)
+        else
+          zh(i,j)=zh(i,j)+ftperp(rij)*exp( zi_vk_tn)
+          zh(j,i)=zh(j,i)+ftperp(rij)*exp(-zi_vk_tn)
+        endif
+      end do
+
+    end do
+  end do
+
+  do i = ndim/2+1,ndim-1
+     do j = ndim/2, ndim,ndim/2
+
+       coord_diff = (coord_temp(i,3)-coord_temp(j,3))**2
+
+  !!!!!! Coupling to adjacent Wigner-Seitz cell with tn
+       do nt = 1 , 3
+         rij = norm2(coord_temp(i,:)-[coord_temp(j,1:2)-tn(:,nt),coord_temp(j,3)])
+         zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+         if(coord_diff < deltaR)then
+           zh(i,j)=zh(i,j)+ft(rij)*exp( zi_vk_tn)
+           zh(j,i)=zh(j,i)+ft(rij)*exp(-zi_vk_tn)
+         else
+           zh(i,j)=zh(i,j)+ftperp(rij)*exp( zi_vk_tn)
+           zh(j,i)=zh(j,i)+ftperp(rij)*exp(-zi_vk_tn)
+         endif
+       end do
+
+     end do
+   end do
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+enddo
+enddo
+
+zh(:,:)=zh(:,:)/cmplx(9.0_dp,0.0_dp,dp)
+
+!!!!!!!!!!! Layer 1
+
+ do i = 1 , ndim/2-1
+   do j = 1 , ndim/2-1
+
+     do nt = 1 , 3
+       rij = norm2(coord_temp(i,:)-[coord_temp(j,1:2)-tn(:,nt),coord_temp(j,3)])
+       zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+
+       zh(i,j)=zh(i,j)+ft(rij)*exp( zi_vk_tn)
+       zh(j,i)=zh(j,i)+ft(rij)*exp(-zi_vk_tn)
+     end do
+
+   end do
+ end do
+
+!!!!!!!!!!! Layer 2
+
+ do i = ndim/2+1,ndim-1
+   do j = ndim/2+1,ndim-1
+
+     do nt = 1 , 3
+       rij = norm2(coord_temp(i,:)-[coord_temp(j,1:2)-tn(:,nt),coord_temp(j,3)])
+       zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+
+       zh(i,j)=zh(i,j)+ft(rij)*exp( zi_vk_tn)
+       zh(j,i)=zh(j,i)+ft(rij)*exp(-zi_vk_tn)
+     end do
+
+   end do
+ end do
+
+!!!!!!!!!!! Coupling Layer 1 to Layer 2
+
+do i = 1 , ndim/2-1
+   do j = ndim/2+1 , ndim-1
+
+     do nt = 1 , 3
+       rij = norm2(coord_temp(i,:)-[coord_temp(j,1:2)-tn(:,nt),coord_temp(j,3)])
+       zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+         zh(i,j)=zh(i,j)+ftperp(rij)*exp( zi_vk_tn)
+         zh(j,i)=zh(j,i)+ftperp(rij)*exp(-zi_vk_tn)
+     end do
+
+   end do
+ end do
+
+!!!!!!!!!!! Coupling Layer 2 to Layer 1
+
+ do i = ndim/2+1 , ndim-1
+    do j = 1 , ndim/2-1
+
+      do nt = 1 , 3
+        rij = norm2(coord_temp(i,:)-[coord_temp(j,1:2)-tn(:,nt),coord_temp(j,3)])
+        zi_vk_tn = cmplx(0.0_dp,dot_product(vk,tn(:,nt)),dp)
+          zh(i,j)=zh(i,j)+ftperp(rij)*exp( zi_vk_tn)
+          zh(j,i)=zh(j,i)+ftperp(rij)*exp(-zi_vk_tn)
+      end do
+
+    end do
+  end do
+
+
+end subroutine ComplexHk_Hartree_sym
+
+
+!c!c!cC
+!c!c!cC
+!c!c!cC
+
+
+
+
+!c!c!cC
+!c!c!cC
+!c!c!cC
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+pure function fv_e(r)
+real(dp)   , intent(in)    :: r
+real(dp) :: fv_e
+
+real(dp) x,I0,K0
+real(dp) xi
+integer(dp) n
+
+xi=100.0_dp/2.46_dp/3._dp ! 10nm/a
+
+fv_e=0._dp
+
+if(r.NE.0)then
+
+if(r.LT.xi/3.)then
+
+do n=0,floor((2._dp-pi*(r/xi))/2._dp/pi/(r/xi))
+
+x=(2*n+1)*pi*(r/xi)
+
+I0=cosh(x)/(1 + 0.5**2*x**2._dp)**0.25*(1 + 0.24273*x**2._dp)/(1 + 0.43023*x**2._dp)
+
+K0=-log(x/2._dp)*I0-0.5772156648942439+0.42278433434244916*(x/2._dp)**2+0.23069609660563425*(x/2._dp)**4 &
++0.03489207637875737*(x/2._dp)**6+0.002615030023757213*(x/2._dp)**8+0.00011811080908871537*(x/2._dp)**10+0.000003889449474816304*(x/2._dp)**12
+
+fv_e=fv_e+4.*K0
+
+enddo
+
+do n=floor((2._dp-pi*(r/xi))/2._dp/pi/(r/xi))+1,100
+
+x=(2*n+1)*pi*(r/xi)
+
+K0=(1.2533127470318168-0.07830516193156768*(2._dp/x)+0.021807436132174653*(2._dp/x)**2 &
+-0.010428688609726261*(2._dp/x)**3 + 0.005672414173632901*(2._dp/x)**4-0.0024265259192435785*(2._dp/x)**5 &
++0.0005249625381161658*(2._dp/x)**6)*exp(-x)/sqrt(x)
+
+fv_e=fv_e+4.*K0
+
+enddo
+
+fv_e=fv_e/xi
+
+else
+
+fv_e=2.0_dp*sqrt(2.0_dp)/sqrt(r/xi)*exp(-pi*r/xi)/xi
+
+endif
+
+else
+fv_e=0.0_dp
+endif
+
+return
+end function fv_e
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+pure function fv_a(r)
+real(dp)   , intent(in)    :: r
+real(dp) :: fv_a
+
+real(dp) xi,alpha0,t0,epsilon0
+
+alpha0=2.5_dp
+t0=2.7_dp
+epsilon0=6.0_dp
+xi=100.0_dp/2.46_dp/3._dp ! 10nm/a
+
+fv_a=2.0_dp*sqrt(2.0_dp)/sqrt(r/xi)*exp(-pi*r/xi)/xi
+
+if(r.EQ.0)then
+fv_a=0.0_dp
+endif
+
+return
+end function fv_a
+
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+subroutine vxy12ID_MF(zvxy1,zvxy2,zvxyI,coord,alpha,zfock,ind_j,ind_l,ndim,ind,vk,tn,nxy)
+
+integer(dp), intent(in)    :: ndim, ind, nxy
+
+integer(dp), intent(in)    :: ind_j(ind), ind_l(ind)
+real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3),alpha
+complex(dp) , intent(in)   :: zfock(ndim,ndim,ind)
+complex(dp), intent(out) :: zvxy1(:,:),zvxy2(:,:),zvxyI(:,:)
+
+integer(dp) :: i, j, nt, icount, n1, n2
+real(dp)    :: rij, rxy, coord_diff
+complex(dp) :: zi_vk_tn,zsum1,zsum2,zsumI,zphase
+
+
+ zvxy1 = cmplx(0.0_dp,0.0_dp,dp)
+ zvxy2 = cmplx(0.0_dp,0.0_dp,dp)
+ zvxyI = cmplx(0.0_dp,0.0_dp,dp)
+
+
+ do i = 1 , ndim
+   do j = i , ndim
+
+     zphase=exp(cmplx(0.0_dp,-dot_product(vk,coord(i,1:2)-coord(j,1:2))*fphase,dp))
+
+     rij = norm2(coord(i,:)-coord(j,:))
+     rxy = coord(i,nxy)-coord(j,nxy)
+
+
+if(coord(i,3)<deltaR .and. coord(j,3)<deltaR .and. rij>deltaR) then
+  zvxy1(i,j)=-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase*rxy*rxy*0.5_dp
+  zvxy1(i,j)=zvxy1(i,j)+ft(rij)*zphase*rxy*rxy
+else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR .and. rij>deltaR) then
+  zvxy2(i,j)=-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase*rxy*rxy*0.5_dp
+  zvxy2(i,j)=zvxy2(i,j)+ft(rij)*zphase*rxy*rxy
+else if(coord(i,3).NE.coord(j,3)) then
+  zvxyI(i,j)=-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase*rxy*rxy*0.5_dp
+  zvxyI(i,j)=zvxyI(i,j) + ftperp(rij)*zphase*rxy*rxy
+endif
+
+!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!
+
+     do icount=2,ind
+     n1=ind_j(icount)
+     n2=ind_l(icount)
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])
+   rxy=coord(i,nxy)-coord(j,nxy)+n1*tn(nxy,1)+n2*tn(nxy,2)
+
+   zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+      zvxy1(i,j)=zvxy1(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*rxy*rxy
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+      zvxy2(i,j)=zvxy2(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*rxy*rxy
+   else if(coord(i,3).NE.coord(j,3)) then
+      zvxyI(i,j)=zvxyI(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase*rxy*rxy
+   endif
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)+n1*tn(:,1)+n2*tn(:,2),coord(j,3)])
+   rxy=coord(i,nxy)-coord(j,nxy)-n1*tn(nxy,1)-n2*tn(nxy,2)
+
+   zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+      zvxy1(i,j)=zvxy1(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*rxy*rxy
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+      zvxy2(i,j)=zvxy2(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*rxy*rxy
+   else if(coord(i,3).NE.coord(j,3)) then
+      zvxyI(i,j)=zvxyI(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase*rxy*rxy
+   endif
+
+   enddo
+
+!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!
+
+   zsum1=cmplx(0.0_dp,0.0_dp,dp)
+   zsum2=cmplx(0.0_dp,0.0_dp,dp)
+   zsumI=cmplx(0.0_dp,0.0_dp,dp)
+   do icount=2,ind
+   n1=ind_j(icount)
+   n2=ind_l(icount)
+
+   zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])
+   rxy=coord(i,nxy)-coord(j,nxy)+n1*tn(nxy,1)+n2*tn(nxy,2)
+
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+      zsum1=zsum1-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)*rxy*rxy
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+      zsum2=zsum2-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)*rxy*rxy
+   else if(coord(i,3).NE.coord(j,3)) then
+      zsumI=zsumI-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)*rxy*rxy
+   endif
+
+   rij = norm2(coord(j,:)-[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])
+   rxy=coord(j,nxy)-coord(i,nxy)+n1*tn(nxy,1)+n2*tn(nxy,2)
+
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+   zsum1=zsum1+alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)*rxy*rxy
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+   zsum2=zsum2+alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)*rxy*rxy
+   else if(coord(i,3).NE.coord(j,3)) then
+   zsumI=zsumI+alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)*rxy*rxy
+   endif
+
+   enddo
+
+   zvxy1(i,j)=zvxy1(i,j)+zsum1*zphase*0.5_dp
+   zvxy2(i,j)=zvxy2(i,j)+zsum2*zphase*0.5_dp
+   zvxyI(i,j)=zvxyI(i,j)+zsumI*zphase*0.5_dp
+
+   end do
+ end do
+
+
+
+end subroutine vxy12ID_MF
+
+!c!c!cC
+!c!c!cC
+!c!c!cC
+
+subroutine vxy12D_MF(zvxy,coord,alpha,zfock,ind_j,ind_l,ndim,ind,vk,tn,nxy)
+
+integer(dp), intent(in)    :: ndim, ind, nxy
+
+integer(dp), intent(in)    :: ind_j(ind), ind_l(ind)
+real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3),alpha
+complex(dp) , intent(in)   :: zfock(ndim,ndim,ind)
+complex(dp), intent(out) :: zvxy(:,:)
+
+integer(dp) :: i, j, nt, icount, n1, n2
+real(dp)    :: rij, rxy, coord_diff
+complex(dp) :: zi_vk_tn,zsum1,zsum2,zsumI,zphase
+
+
+ zvxy = cmplx(0.0_dp,0.0_dp,dp)
+
+
+ do i = 1 , ndim
+   do j = i , ndim
+
+     zphase=exp(cmplx(0.0_dp,-dot_product(vk,coord(i,1:2)-coord(j,1:2))*fphase,dp))
+
+     rij = norm2(coord(i,:)-coord(j,:))
+     rxy = coord(i,nxy)-coord(j,nxy)
+
+
+if(coord(i,3)<deltaR .and. coord(j,3)<deltaR .and. rij>deltaR) then
+  zvxy(i,j)=-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase*rxy*rxy
+  zvxy(i,j)=zvxy(i,j)+ft(rij)*zphase*rxy*rxy
+else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR .and. rij>deltaR) then
+  zvxy(i,j)=-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase*rxy*rxy
+  zvxy(i,j)=zvxy(i,j)+ft(rij)*zphase*rxy*rxy
+else if(coord(i,3).NE.coord(j,3)) then
+  zvxy(i,j)=-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase*rxy*rxy
+  zvxy(i,j)=zvxy(i,j) + ftperp(rij)*zphase*rxy*rxy
+endif
+
+!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!
+
+     do icount=2,ind
+     n1=ind_j(icount)
+     n2=ind_l(icount)
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])
+   rxy=coord(i,nxy)-coord(j,nxy)+n1*tn(nxy,1)+n2*tn(nxy,2)
+
+   zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+      zvxy(i,j)=zvxy(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*rxy*rxy
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+      zvxy(i,j)=zvxy(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*rxy*rxy
+   else if(coord(i,3).NE.coord(j,3)) then
+      zvxy(i,j)=zvxy(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase*rxy*rxy
+   endif
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)+n1*tn(:,1)+n2*tn(:,2),coord(j,3)])
+   rxy=coord(i,nxy)-coord(j,nxy)-n1*tn(nxy,1)-n2*tn(nxy,2)
+
+   zi_vk_tn = cmplx(0.0_dp,-dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+      zvxy(i,j)=zvxy(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*rxy*rxy
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+      zvxy(i,j)=zvxy(i,j)+ft(rij)*exp(-zi_vk_tn)*zphase*rxy*rxy
+   else if(coord(i,3).NE.coord(j,3)) then
+      zvxy(i,j)=zvxy(i,j)+ftperp(rij)*exp(-zi_vk_tn)*zphase*rxy*rxy
+   endif
+
+   enddo
+
+!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!
+
+   zsum1=cmplx(0.0_dp,0.0_dp,dp)
+   zsum2=cmplx(0.0_dp,0.0_dp,dp)
+   zsumI=cmplx(0.0_dp,0.0_dp,dp)
+   do icount=2,ind
+   n1=ind_j(icount)
+   n2=ind_l(icount)
+
+   zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])
+   rxy=coord(i,nxy)-coord(j,nxy)+n1*tn(nxy,1)+n2*tn(nxy,2)
+
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+      zsum1=zsum1-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)*rxy*rxy
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+      zsum2=zsum2-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)*rxy*rxy
+   else if(coord(i,3).NE.coord(j,3)) then
+      zsumI=zsumI-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)*rxy*rxy
+   endif
+
+   rij = norm2(coord(j,:)-[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])
+   rxy=coord(j,nxy)-coord(i,nxy)+n1*tn(nxy,1)+n2*tn(nxy,2)
+
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+   zsum1=zsum1+alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)*rxy*rxy
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+   zsum2=zsum2+alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)*rxy*rxy
+   else if(coord(i,3).NE.coord(j,3)) then
+   zsumI=zsumI+alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)*rxy*rxy
+   endif
+
+   enddo
+
+   zvxy(i,j)=zvxy(i,j)+zsum1*zphase+zsum2*zphase+zsumI*zphase
+
+   end do
+ end do
+
+
+
+end subroutine vxy12D_MF
+
+
+subroutine vxy12ID_NO(zvxy1,zvxy2,zvxyI,coord,alpha,zfock,ind_j,ind_l,ndim,ind,vk,tn,nxy)
+
+integer(dp), intent(in)    :: ndim, ind, nxy
+
+integer(dp), intent(in)    :: ind_j(ind), ind_l(ind)
+real(dp)   , intent(in)    :: tn(2,3), vk(2), coord(ndim,3),alpha
+complex(dp) , intent(in)   :: zfock(ndim,ndim,ind)
+complex(dp), intent(out) :: zvxy1(:,:),zvxy2(:,:),zvxyI(:,:)
+
+integer(dp) :: i, j, nt, icount, n1, n2
+real(dp)    :: rij, rxy, coord_diff
+complex(dp) :: zi_vk_tn,zsum1,zsum2,zsumI,zphase
+
+
+ zvxy1 = cmplx(0.0_dp,0.0_dp,dp)
+ zvxy2 = cmplx(0.0_dp,0.0_dp,dp)
+ zvxyI = cmplx(0.0_dp,0.0_dp,dp)
+
+
+ do i = 1 , ndim
+   do j = i , ndim
+
+     zphase=exp(cmplx(0.0_dp,-dot_product(vk,coord(i,1:2)-coord(j,1:2))*fphase,dp))
+
+     rij = norm2(coord(i,:)-coord(j,:))
+     rxy = coord(i,nxy)-coord(j,nxy)
+
+
+if(coord(i,3)<deltaR .and. coord(j,3)<deltaR .and. rij>deltaR) then
+  zvxy1(i,j)=-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase*rxy*rxy
+else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR .and. rij>deltaR) then
+  zvxy2(i,j)=-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase*rxy*rxy
+else if(coord(i,3).NE.coord(j,3)) then
+  zvxyI(i,j)=-alpha*fv(coord(i,:),coord(j,:))*conjg(zfock(i,j,1))*zphase*rxy*rxy
+endif
+
+
+!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!
+
+   zsum1=cmplx(0.0_dp,0.0_dp,dp)
+   zsum2=cmplx(0.0_dp,0.0_dp,dp)
+   zsumI=cmplx(0.0_dp,0.0_dp,dp)
+   do icount=2,ind
+   n1=ind_j(icount)
+   n2=ind_l(icount)
+
+   zi_vk_tn = cmplx(0.0_dp,dot_product(vk,n1*tn(:,1)+n2*tn(:,2)),dp)
+
+   rij = norm2(coord(i,:)-[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])
+   rxy=coord(i,nxy)-coord(j,nxy)+n1*tn(nxy,1)+n2*tn(nxy,2)
+
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+      zsum1=zsum1-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)*rxy*rxy
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+      zsum2=zsum2-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)*rxy*rxy
+   else if(coord(i,3).NE.coord(j,3)) then
+      zsumI=zsumI-alpha*fv(coord(i,:),[coord(j,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(j,3)])*conjg(zfock(i,j,icount))*exp(-zi_vk_tn)*rxy*rxy
+   endif
+
+   rij = norm2(coord(j,:)-[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])
+   rxy=coord(j,nxy)-coord(i,nxy)+n1*tn(nxy,1)+n2*tn(nxy,2)
+
+   if(coord(i,3)<deltaR .and. coord(j,3)<deltaR) then
+   zsum1=zsum1+alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)*rxy*rxy
+   else if(coord(i,3)>deltaR .and. coord(j,3)>deltaR) then
+   zsum2=zsum2+alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)*rxy*rxy
+   else if(coord(i,3).NE.coord(j,3)) then
+   zsumI=zsumI+alpha*fv(coord(j,:),[coord(i,1:2)-n1*tn(:,1)-n2*tn(:,2),coord(i,3)])*zfock(j,i,icount)*exp( zi_vk_tn)*rxy*rxy
+   endif
+
+   enddo
+
+   zvxy1(i,j)=zvxy1(i,j)+zsum1*zphase
+   zvxy2(i,j)=zvxy2(i,j)+zsum2*zphase
+   zvxyI(i,j)=zvxyI(i,j)+zsumI*zphase
+
+   end do
+ end do
+
+
+
+end subroutine vxy12ID_NO
+end module ResponseHartreeFock

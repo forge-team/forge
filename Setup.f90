@@ -221,3 +221,44 @@ suffix = s
 end subroutine AssignSuffix
 
 end module Setup
+
+
+! Postprocessing compatibility namespace (shares the dev physical settings).
+! Response settings; physical parameters are imported from the shared dev Setup.
+module ResponseSetup
+ use Setup, only: dp, numk, ntheta, ndim, numI, numC, numS, nfilling, nrelax, xi, fphase, pressure, U, a0, pi, tz, a1, a2, dirFock
+
+ implicit none
+ !Fock-SYM-filling+0.0-i22-relax1-eps4.0-U3.10-scr1-xi100.0-delta.000-numI2-numk6-dp8.dat
+ integer(kind=dp), parameter :: numb = ndim
+ integer(kind=dp), parameter :: ncb = ndim/2
+ integer(kind=dp), parameter :: nFermiSea=1!ndim/2-numb+ncb+1-128!1<=nFermiSea=<ndim/2-numb+ncb+1
+ integer(kind=dp), parameter :: nRandom=1
+ integer(kind=dp), parameter :: nDrude=0_dp
+ integer(kind=dp), parameter :: nDos=0_dp
+ !integer(kind=dp) , parameter :: nT=7
+ !real(dp)    , parameter :: ftemperature(nT) =[0._dp,1._dp,10._dp,36._dp,50._dp,200._dp,300._dp]
+ integer(kind=dp) , parameter :: nT=1
+ real(dp)    , parameter :: ftemperature(nT) =[1._dp]
+ integer(kind=dp), parameter :: nmu=40
+
+ integer(kind=dp), parameter :: nPrintDensity=0
+ integer(kind=dp), parameter :: nRead=1
+ integer(kind=dp), parameter :: nWrite=1
+ character(8) :: dir='output4/'
+ real(dp), parameter :: deltaR = 0.1_dp
+ real(dp), parameter :: r0 = 0.184_dp
+ real(dp), parameter :: d0 = 1.35772_dp/pressure
+ real(dp), parameter :: tperp = 1._dp
+ real(dp), parameter :: mass1=0._dp!-0.005_dp
+
+ real(dp), parameter :: T_in_ev = 8.617342791d-5
+ real(dp), parameter :: sq3 = sqrt(3.0_dp)
+ real(dp), parameter :: vkd=4.0_dp*pi/3.0_dp
+
+
+ !real(dp) :: vGamma(2),vK1(2),vK2(2),vM(2),vshift(2)
+ !real(dp) :: aGM,aKG,aMK,aT,eD
+
+
+end module ResponseSetup
