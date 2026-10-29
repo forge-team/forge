@@ -532,7 +532,7 @@ subroutine GetFock(zFock,zSortedEigenvectors,ndim,numb,numk,DegFactor,OccStates,
   !$omp end parallel do
 
   ! Select all degenerate states and choose the average to comply with the correct symmetry        
-  zdeg=cmplx(DegFactor,dp)
+  zdeg=cmplx(DegFactor,0.0_dp,dp)
 
   !$omp parallel do & 
   !$omp private(nband, ivk1,ivk2,vk,zP) &
@@ -617,7 +617,7 @@ subroutine GetFock_C3(zFock,zSortedEigenvectors,ndim,RotateLayers,numb,numk,DegF
   !$omp end parallel do
 
   ! Select all degenerate states and choose the average to comply with the correct symmetry        
-  zdeg=cmplx(DegFactor,dp)
+  zdeg=cmplx(DegFactor,0.0_dp,dp)
   
   !$omp parallel do & 
   !$omp private(nband, ivk1,ivk2,icount,vk,zP) &
