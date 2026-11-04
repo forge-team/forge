@@ -40,8 +40,12 @@ program compute_OrderParameterLayers
     ! Keep geometry construction identical to the migrated band/order-parameter drivers.
     call BuildGeometry(Coords,t1,t2,t3,g1,g12,RotMatrix)
     cellVectors(0,:) = [0.0_dp,0.0_dp]
-    cellVectors(1,:) = t1;  cellVectors(2,:) = t2;  cellVectors(3,:) = t3
-    cellVectors(4,:) = -t1; cellVectors(5,:) = -t2; cellVectors(6,:) = -t3
+    cellVectors(1,:) = t1
+    cellVectors(2,:) = t2
+    cellVectors(3,:) = t3
+    cellVectors(4,:) = -t1
+    cellVectors(5,:) = -t2
+    cellVectors(6,:) = -t3
 
     ! WignerSeitzCell rotates layer 1 by RotMatrix and layer 2 by its transpose.
     layerVectors(:,1,1) = matmul(RotMatrix,a1)
@@ -147,18 +151,23 @@ contains
         integer(dp), intent(in) :: layer,sublatticeIndex
         integer(dp), intent(out) :: lo,hi
         integer(dp) :: quarter,half
-        quarter=ndim/4; half=ndim/2
+        quarter=ndim/4
+        half=ndim/2
         if(layer == 1) then
             if(sublatticeIndex == 1) then
-                lo=1; hi=quarter
+                lo=1
+                hi=quarter
             else
-                lo=quarter+1; hi=half
+                lo=quarter+1
+                hi=half
             endif
         else
             if(sublatticeIndex == 1) then
-                lo=half+1; hi=3*quarter
+                lo=half+1
+                hi=3*quarter
             else
-                lo=3*quarter+1; hi=ndim
+                lo=3*quarter+1
+                hi=ndim
             endif
         endif
     end subroutine SiteRange
@@ -198,20 +207,31 @@ contains
         ! Minimum-cost one-to-one pairing across the periodic moire cell.
         ! This assigns the relative displacement zeta_i without duplicating
         ! boundary centers when two independent nearest-neighbor choices tie.
-        u=0.0_dp; v=0.0_dp; p=0; way=0
+        u=0.0_dp
+        v=0.0_dp
+        p=0
+        way=0
         do i=1,n
-            p(0)=i; j0=0; minv=huge(1.0_dp); used=.false.; way=0
+            p(0)=i
+            j0=0
+            minv=huge(1.0_dp)
+            used=.false.
+            way=0
             do
                 used(j0)=.true.
-                i0=p(j0); deltaCost=huge(1.0_dp); j1=0
+                i0=p(j0)
+                deltaCost=huge(1.0_dp)
+                j1=0
                 do j=1,n
                     if(.not.used(j)) then
                         cur=cost(i0,j)-u(i0)-v(j)
                         if(cur < minv(j)) then
-                            minv(j)=cur; way(j)=j0
+                            minv(j)=cur
+                            way(j)=j0
                         endif
                         if(minv(j) < deltaCost) then
-                            deltaCost=minv(j); j1=j
+                            deltaCost=minv(j)
+                            j1=j
                         endif
                     endif
                 enddo
@@ -249,13 +269,16 @@ contains
         integer(dp) :: j,q
         real(dp) :: d(2),dist
 
-        residual=huge(1.0_dp); site=0; imageCell=0
+        residual=huge(1.0_dp)
+        site=0
+        imageCell=0
         do j=lo,hi
             do q=0,6
                 d=Coords(j,1:2)+cellVectors(q,:)-target
                 dist=sqrt(dot_product(d,d))
                 if(dist < residual) then
-                    residual=dist; site=j
+                    residual=dist
+                    site=j
                     imageCell=[0,0]
                     if(q > 0) imageCell=CellCoordinates(q)
                 endif
@@ -267,13 +290,20 @@ contains
         integer(dp), intent(in) :: q
         integer(dp) :: cell(2)
         select case(q)
-        case(1); cell=[ 1, 0]
-        case(2); cell=[ 0, 1]
-        case(3); cell=[-1, 1]
-        case(4); cell=[-1, 0]
-        case(5); cell=[ 0,-1]
-        case(6); cell=[ 1,-1]
-        case default; cell=[0,0]
+        case(1)
+        cell=[ 1, 0]
+        case(2)
+        cell=[ 0, 1]
+        case(3)
+        cell=[-1, 1]
+        case(4)
+        cell=[-1, 0]
+        case(5)
+        cell=[ 0,-1]
+        case(6)
+        cell=[ 1,-1]
+        case default
+        cell=[0,0]
         end select
     end function CellCoordinates
 
@@ -314,9 +344,13 @@ contains
         call LocateSite(target,loA,hiA,siteA,cellA,errorA)
         call LocateSite(target,loB,hiB,siteB,cellB,errorB)
         if(errorA <= errorB) then
-            site=siteA; imageCell=cellA; residual=errorA
+            site=siteA
+            imageCell=cellA
+            residual=errorA
         else
-            site=siteB; imageCell=cellB; residual=errorB
+            site=siteB
+            imageCell=cellB
+            residual=errorB
         endif
         if(residual > 0.25_dp*a0) then
             write(*,*) 'No atom found at requested lattice position; residual, layer:',residual,layer
@@ -332,33 +366,57 @@ contains
 
         s=1.0_dp
         if(centerSublattice == 'B') s=-1.0_dp
-        a1b=layerVectors(:,1,braLayer); a2b=layerVectors(:,2,braLayer)
-        a1k=layerVectors(:,1,ketLayer); a2k=layerVectors(:,2,ketLayer)
-        d1b=deltaVec(:,1,braLayer); d2b=deltaVec(:,2,braLayer); d3b=deltaVec(:,3,braLayer)
-        d1k=deltaVec(:,1,ketLayer); d2k=deltaVec(:,2,ketLayer); d3k=deltaVec(:,3,ketLayer)
+        a1b=layerVectors(:,1,braLayer)
+        a2b=layerVectors(:,2,braLayer)
+        a1k=layerVectors(:,1,ketLayer)
+        a2k=layerVectors(:,2,ketLayer)
+        d1b=deltaVec(:,1,braLayer)
+        d2b=deltaVec(:,2,braLayer)
+        d3b=deltaVec(:,3,braLayer)
+        d1k=deltaVec(:,1,ketLayer)
+        d2k=deltaVec(:,2,ketLayer)
+        d3k=deltaVec(:,3,ketLayer)
 
         select case(loop)
         case(1)
-            rowOffset(:,1)= s*d1b;                 colOffset(:,1)=0.0_dp
-            rowOffset(:,2)=-s*a2b;                 colOffset(:,2)= s*d1k
-            rowOffset(:,3)=-s*a2b+s*d3b;           colOffset(:,3)=-s*a2k
-            rowOffset(:,4)=-s*a1b;                 colOffset(:,4)=-s*a2k+s*d3k
-            rowOffset(:,5)=-s*a1b+s*d2b;           colOffset(:,5)=-s*a1k
-            rowOffset(:,6)=0.0_dp;                 colOffset(:,6)=-s*a1k+s*d2k
+            rowOffset(:,1)= s*d1b
+            colOffset(:,1)=0.0_dp
+            rowOffset(:,2)=-s*a2b
+            colOffset(:,2)= s*d1k
+            rowOffset(:,3)=-s*a2b+s*d3b
+            colOffset(:,3)=-s*a2k
+            rowOffset(:,4)=-s*a1b
+            colOffset(:,4)=-s*a2k+s*d3k
+            rowOffset(:,5)=-s*a1b+s*d2b
+            colOffset(:,5)=-s*a1k
+            rowOffset(:,6)=0.0_dp
+            colOffset(:,6)=-s*a1k+s*d2k
         case(2)
-            rowOffset(:,1)= s*d2b;                 colOffset(:,1)=0.0_dp
-            rowOffset(:,2)= s*a1b;                 colOffset(:,2)= s*d2k
-            rowOffset(:,3)= s*a1b+s*d1b;           colOffset(:,3)= s*a1k
-            rowOffset(:,4)= s*a1b-s*a2b;           colOffset(:,4)= s*a1k+s*d1k
-            rowOffset(:,5)= s*d1b;                 colOffset(:,5)= s*a1k-s*a2k
-            rowOffset(:,6)=0.0_dp;                 colOffset(:,6)= s*d1k
+            rowOffset(:,1)= s*d2b
+            colOffset(:,1)=0.0_dp
+            rowOffset(:,2)= s*a1b
+            colOffset(:,2)= s*d2k
+            rowOffset(:,3)= s*a1b+s*d1b
+            colOffset(:,3)= s*a1k
+            rowOffset(:,4)= s*a1b-s*a2b
+            colOffset(:,4)= s*a1k+s*d1k
+            rowOffset(:,5)= s*d1b
+            colOffset(:,5)= s*a1k-s*a2k
+            rowOffset(:,6)=0.0_dp
+            colOffset(:,6)= s*d1k
         case(3)
-            rowOffset(:,1)= s*d3b;                 colOffset(:,1)=0.0_dp
-            rowOffset(:,2)=-s*a1b+s*a2b;           colOffset(:,2)= s*d3k
-            rowOffset(:,3)=-s*a1b+s*a2b+s*d2b;     colOffset(:,3)=-s*a1k+s*a2k
-            rowOffset(:,4)= s*a2b;                 colOffset(:,4)=-s*a1k+s*a2k+s*d2k
-            rowOffset(:,5)= s*a2b+s*d1b;           colOffset(:,5)= s*a2k
-            rowOffset(:,6)=0.0_dp;                 colOffset(:,6)= s*a2k+s*d1k
+            rowOffset(:,1)= s*d3b
+            colOffset(:,1)=0.0_dp
+            rowOffset(:,2)=-s*a1b+s*a2b
+            colOffset(:,2)= s*d3k
+            rowOffset(:,3)=-s*a1b+s*a2b+s*d2b
+            colOffset(:,3)=-s*a1k+s*a2k
+            rowOffset(:,4)= s*a2b
+            colOffset(:,4)=-s*a1k+s*a2k+s*d2k
+            rowOffset(:,5)= s*a2b+s*d1b
+            colOffset(:,5)= s*a2k
+            rowOffset(:,6)=0.0_dp
+            colOffset(:,6)= s*a2k+s*d1k
         case default
             error stop 'Invalid loop channel'
         end select

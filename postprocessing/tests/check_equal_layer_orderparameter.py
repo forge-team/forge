@@ -41,7 +41,7 @@ declarations = declarations.replace('program compute_LayerOrderParameter', 'prog
 declarations = declarations.replace('    implicit none', '''    use OrderPlot, only: getKekuleLattice, getKekuleNeighbors, InterSubInterValAlt
     use Setup, only: dirFock
     implicit none''')
-geometry = source[source.index('    allocate(coord('):source.index('    ! Pair physical centers once')]
+geometry = source[source.index('    allocate(coord('):source.index('    ! Pair physical centers,')]
 procedures = source[source.index('\ncontains\n'):source.rindex('end program compute_LayerOrderParameter')]
 main = (REPO / 'Main.f90').read_text()
 writer = re.search(r'rcc=0\b.*?close\(91\)', main[main.index('if (nWriteFock.EQ.1)'):], re.S).group()
@@ -58,6 +58,7 @@ EXTRA_DECLARATIONS = r'''
 '''
 
 BODY = r'''
+    checkGeometry=.false.
     call get_command_argument(1,mode)
     ncells=ndim/4
     numNeighborCells=ind
@@ -143,10 +144,8 @@ BODY = r'''
             do i=first,last
                 idx=i-(layer-1)*ndim/2
                 r1=coord_ref(i,1:2)
-                call CacheLoopSites(idx,1_dp,layer,layer,sublattice,r1,r1)
-                call CacheLoopSites(idx,2_dp,layer,layer,sublattice,r1,r1)
-                call CachedLoopChannels(idx,1_dp,Delta21)
-                call CachedLoopChannels(idx,2_dp,Delta12)
+                call LoopChannels(layer,layer,sublattice,r1,r1,Delta21)
+                call LoopChannels(layer,layer,sublattice,r1,r1,Delta12)
                 phase(i)=exp(2.0_dp*zi*dot_product(valleyK(:,layer),r1))
                 call ProjectLayerChannels(Delta21,Delta12,sublattice,phase(i),production(:,i))
                 if(sub==1) then

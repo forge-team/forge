@@ -343,3 +343,21 @@ Full production grid convergence remains to be checked.
 
 The original-source routine comparison is in [routine_inventory.md](routine_inventory.md);
 its line numbers and callers refer to the supplied originals before adaptation.
+
+## Programming style
+
+The original programs supplied for FORGE use procedural Fortran: declarations,
+explicit loops and direct calculations. Follow that style when changing these
+programs; see [AGENTS.md](../AGENTS.md).
+
+The layer-order driver evaluates each six-term overlap sum directly, including
+the three-neighbor average, the opposite-cell conjugation and the valley phase.
+Site lookup and Fock evaluation are in `LoopChannels`; no separate cached bond
+arrays are needed. Lookup repeats for each spin, so a calculation with several
+spin sectors may take longer. The periodic one-to-one center assignment remains
+because independent nearest-site choices can duplicate boundary centers.
+
+`ReadFock` reads the central lower triangle and the remaining full matrices with
+explicit loops matching the producer's record order. File-size and read-error
+checks remain in place. The spectral formulas and the simple existing Makefiles
+retain the published `dev` implementation.

@@ -84,8 +84,9 @@ cancels from every observable.
 The producer's Fock convention is `D(i,j,R)=<psi_i^* psi_j> exp(-i*k.R)` before
 the momentum sum. For two translated sites the required cell index is
 `rowCell-colCell`. If only `-R` is stored, the overlap is obtained as
-`conjg(D(j,i,-R))`. These endpoint and cell lookups are cached before reading
-the state and reused for all spin sectors.
+`conjg(D(j,i,-R))`. The program locates the endpoints and evaluates each overlap directly from
+the saved Fock matrix inside the loop sum. It does not keep separate lookup
+arrays. This favors a direct calculation over reusing lookups between spins.
 
 ## Projection and normalization
 
