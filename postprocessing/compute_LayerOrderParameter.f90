@@ -12,13 +12,13 @@ program compute_LayerOrderParameter
     integer(dp) :: center2, centerCell(2)
     integer(dp), parameter :: nLoopSamples(3)=[3_dp,3_dp,1_dp]
     integer(dp), allocatable :: ind_j(:), ind_l(:), centerMap(:), centerShift(:,:)
-    integer(dp), allocatable :: rowSites(:,:,:,:), colSites(:,:,:,:), fockCells(:,:,:,:)
-    logical, allocatable :: reverseCells(:,:,:,:), centerSeen(:)
+    logical, allocatable :: centerSeen(:)
     real(dp) :: t1(2), t2(2), t3(2), vq1(2), vq12(2), ang_mat(2,2), layerRotation(2,2)
-    real(dp) :: layerVectors(2,2,2), deltaVec(2,3,2), valleyK(2,2), r1(2), r2(2)
+    real(dp) :: layerVectors(2,2,2), deltaVec(2,3,2), valleyK(2,2), r1(2), r2(2), center(2)
     real(dp) :: geometryTolerance, cellDet
-    real(dp), allocatable :: coord(:,:), coord_ref(:,:), outputCenters(:,:)
-    complex(dp), allocatable :: zFock(:,:,:,:), chiPhase(:)
+    real(dp), allocatable :: coord(:,:), coord_ref(:,:)
+    complex(dp), allocatable :: zFock(:,:,:,:)
+    complex(dp) :: chiPhase
     complex(dp) :: Delta21(3), Delta12(3), localRho(4), summedRho(4), sublatticeRho(4,2)
     complex(dp), parameter :: zi=cmplx(0.0_dp,1.0_dp,dp)
     character(210) :: parameters
@@ -40,10 +40,8 @@ program compute_LayerOrderParameter
     endif
     checkGeometry=(trim(argument)=='--check-geometry')
 
-    allocate(coord(ndim,3),coord_ref(ndim,3),outputCenters(ndim/2,2))
-    allocate(centerMap(ndim),centerShift(2,ndim),centerSeen(ndim),chiPhase(ndim/2))
-    allocate(rowSites(18,3,2,ndim/2),colSites(18,3,2,ndim/2), &
-             fockCells(18,3,2,ndim/2),reverseCells(18,3,2,ndim/2))
+    allocate(coord(ndim,3),coord_ref(ndim,3))
+    allocate(centerMap(ndim),centerShift(2,ndim),centerSeen(ndim))
     call NumberNeighborCells(numI,ind)
     allocate(ind_j(ind),ind_l(ind))
     call OrderNeighborCells(numI,ind,ind_j,ind_l)
@@ -69,7 +67,7 @@ program compute_LayerOrderParameter
         valleyK(:,layer)=matmul(layerRotation,[-4.0_dp*pi/3.0_dp,0.0_dp])
     enddo
 
-    ! Pair physical centers once, then locate each bond on the exact reference
+    ! Pair physical centers, then locate each bond on the exact reference
     ! lattice. Relaxation changes orbital positions, not the site labels/topology.
     do sub=1,2
         call SiteRange(1_dp,sub,first,last)
@@ -84,11 +82,10 @@ program compute_LayerOrderParameter
             centerSeen(center2)=.true.
             r1=coord_ref(i,1:2)
             r2=coord_ref(center2,1:2)+real(centerCell(1),dp)*t1+real(centerCell(2),dp)*t2
-            chiPhase(i)=exp(zi*(dot_product(valleyK(:,1),r1)+dot_product(valleyK(:,2),r2)))
-            outputCenters(i,:)=0.5_dp*(coord(i,1:2)+coord(center2,1:2) &
-                +real(centerCell(1),dp)*t1+real(centerCell(2),dp)*t2)
-            call CacheLoopSites(i,1_dp,2_dp,1_dp,sublattice,r2,r1)
-            call CacheLoopSites(i,2_dp,1_dp,2_dp,sublattice,r1,r2)
+            if(checkGeometry) then
+                call LoopChannels(2_dp,1_dp,sublattice,r2,r1,Delta21)
+                call LoopChannels(1_dp,2_dp,sublattice,r1,r2,Delta12)
+            endif
         enddo
         call SiteRange(2_dp,sub,first,last)
         if(any(.not.centerSeen(first:last))) error stop 'Some layer-2 centers were not paired'
@@ -126,11 +123,18 @@ program compute_LayerOrderParameter
             sublattice='A'
             if(sub==2) sublattice='B'
             do i=first,last
-                call CachedLoopChannels(i,1_dp,Delta21)
-                call CachedLoopChannels(i,2_dp,Delta12)
-                call ProjectLayerChannels(Delta21,Delta12,sublattice,chiPhase(i),localRho)
+                center2=centerMap(i)
+                centerCell=centerShift(:,i)
+                r1=coord_ref(i,1:2)
+                r2=coord_ref(center2,1:2)+real(centerCell(1),dp)*t1+real(centerCell(2),dp)*t2
+                chiPhase=exp(zi*(dot_product(valleyK(:,1),r1)+dot_product(valleyK(:,2),r2)))
+                center=0.5_dp*(coord(i,1:2)+coord(center2,1:2) &
+                    +real(centerCell(1),dp)*t1+real(centerCell(2),dp)*t2)
+                call LoopChannels(2_dp,1_dp,sublattice,r2,r1,Delta21)
+                call LoopChannels(1_dp,2_dp,sublattice,r1,r2,Delta12)
+                call ProjectLayerChannels(Delta21,Delta12,sublattice,chiPhase,localRho)
                 sublatticeRho(:,sub)=sublatticeRho(:,sub)+localRho
-                write(unit,'(2(I0,1X),A1,10(1X,ES24.16))') i,centerMap(i),sublattice,outputCenters(i,:), &
+                write(unit,'(2(I0,1X),A1,10(1X,ES24.16))') i,centerMap(i),sublattice,center, &
                     (real(localRho(loop),dp),aimag(localRho(loop)),loop=1,4)
             enddo
         enddo
@@ -170,18 +174,23 @@ contains
         integer(dp), intent(in) :: layer,sublatticeIndex
         integer(dp), intent(out) :: lo,hi
         integer(dp) :: quarter,half
-        quarter=ndim/4; half=ndim/2
+        quarter=ndim/4
+        half=ndim/2
         if(layer == 1) then
             if(sublatticeIndex == 1) then
-                lo=1; hi=quarter
+                lo=1
+                hi=quarter
             else
-                lo=quarter+1; hi=half
+                lo=quarter+1
+                hi=half
             endif
         else
             if(sublatticeIndex == 1) then
-                lo=half+1; hi=3*quarter
+                lo=half+1
+                hi=3*quarter
             else
-                lo=3*quarter+1; hi=ndim
+                lo=3*quarter+1
+                hi=ndim
             endif
         endif
     end subroutine SiteRange
@@ -221,20 +230,31 @@ contains
         ! Minimum-cost one-to-one pairing across the periodic moire cell.
         ! This assigns the relative displacement zeta_i without duplicating
         ! boundary centers when two independent nearest-neighbor choices tie.
-        u=0.0_dp; v=0.0_dp; p=0; way=0
+        u=0.0_dp
+        v=0.0_dp
+        p=0
+        way=0
         do i=1,n
-            p(0)=i; j0=0; minv=huge(1.0_dp); used=.false.; way=0
+            p(0)=i
+            j0=0
+            minv=huge(1.0_dp)
+            used=.false.
+            way=0
             do
                 used(j0)=.true.
-                i0=p(j0); deltaCost=huge(1.0_dp); j1=0
+                i0=p(j0)
+                deltaCost=huge(1.0_dp)
+                j1=0
                 do j=1,n
                     if(.not.used(j)) then
                         cur=cost(i0,j)-u(i0)-v(j)
                         if(cur < minv(j)) then
-                            minv(j)=cur; way(j)=j0
+                            minv(j)=cur
+                            way(j)=j0
                         endif
                         if(minv(j) < deltaCost) then
-                            deltaCost=minv(j); j1=j
+                            deltaCost=minv(j)
+                            j1=j
                         endif
                     endif
                 enddo
@@ -272,33 +292,57 @@ contains
 
         s=1.0_dp
         if(centerSublattice == 'B') s=-1.0_dp
-        a1b=layerVectors(:,1,braLayer); a2b=layerVectors(:,2,braLayer)
-        a1k=layerVectors(:,1,ketLayer); a2k=layerVectors(:,2,ketLayer)
-        d1b=deltaVec(:,1,braLayer); d2b=deltaVec(:,2,braLayer); d3b=deltaVec(:,3,braLayer)
-        d1k=deltaVec(:,1,ketLayer); d2k=deltaVec(:,2,ketLayer); d3k=deltaVec(:,3,ketLayer)
+        a1b=layerVectors(:,1,braLayer)
+        a2b=layerVectors(:,2,braLayer)
+        a1k=layerVectors(:,1,ketLayer)
+        a2k=layerVectors(:,2,ketLayer)
+        d1b=deltaVec(:,1,braLayer)
+        d2b=deltaVec(:,2,braLayer)
+        d3b=deltaVec(:,3,braLayer)
+        d1k=deltaVec(:,1,ketLayer)
+        d2k=deltaVec(:,2,ketLayer)
+        d3k=deltaVec(:,3,ketLayer)
 
         select case(loop)
         case(1)
-            rowOffset(:,1)= s*d1b;                 colOffset(:,1)=0.0_dp
-            rowOffset(:,2)=-s*a2b;                 colOffset(:,2)= s*d1k
-            rowOffset(:,3)=-s*a2b+s*d3b;           colOffset(:,3)=-s*a2k
-            rowOffset(:,4)=-s*a1b;                 colOffset(:,4)=-s*a2k+s*d3k
-            rowOffset(:,5)=-s*a1b+s*d2b;           colOffset(:,5)=-s*a1k
-            rowOffset(:,6)=0.0_dp;                 colOffset(:,6)=-s*a1k+s*d2k
+            rowOffset(:,1)= s*d1b
+            colOffset(:,1)=0.0_dp
+            rowOffset(:,2)=-s*a2b
+            colOffset(:,2)= s*d1k
+            rowOffset(:,3)=-s*a2b+s*d3b
+            colOffset(:,3)=-s*a2k
+            rowOffset(:,4)=-s*a1b
+            colOffset(:,4)=-s*a2k+s*d3k
+            rowOffset(:,5)=-s*a1b+s*d2b
+            colOffset(:,5)=-s*a1k
+            rowOffset(:,6)=0.0_dp
+            colOffset(:,6)=-s*a1k+s*d2k
         case(2)
-            rowOffset(:,1)= s*d2b;                 colOffset(:,1)=0.0_dp
-            rowOffset(:,2)= s*a1b;                 colOffset(:,2)= s*d2k
-            rowOffset(:,3)= s*a1b+s*d1b;           colOffset(:,3)= s*a1k
-            rowOffset(:,4)= s*a1b-s*a2b;           colOffset(:,4)= s*a1k+s*d1k
-            rowOffset(:,5)= s*d1b;                 colOffset(:,5)= s*a1k-s*a2k
-            rowOffset(:,6)=0.0_dp;                 colOffset(:,6)= s*d1k
+            rowOffset(:,1)= s*d2b
+            colOffset(:,1)=0.0_dp
+            rowOffset(:,2)= s*a1b
+            colOffset(:,2)= s*d2k
+            rowOffset(:,3)= s*a1b+s*d1b
+            colOffset(:,3)= s*a1k
+            rowOffset(:,4)= s*a1b-s*a2b
+            colOffset(:,4)= s*a1k+s*d1k
+            rowOffset(:,5)= s*d1b
+            colOffset(:,5)= s*a1k-s*a2k
+            rowOffset(:,6)=0.0_dp
+            colOffset(:,6)= s*d1k
         case(3)
-            rowOffset(:,1)= s*d3b;                 colOffset(:,1)=0.0_dp
-            rowOffset(:,2)=-s*a1b+s*a2b;           colOffset(:,2)= s*d3k
-            rowOffset(:,3)=-s*a1b+s*a2b+s*d2b;     colOffset(:,3)=-s*a1k+s*a2k
-            rowOffset(:,4)= s*a2b;                 colOffset(:,4)=-s*a1k+s*a2k+s*d2k
-            rowOffset(:,5)= s*a2b+s*d1b;           colOffset(:,5)= s*a2k
-            rowOffset(:,6)=0.0_dp;                 colOffset(:,6)= s*a2k+s*d1k
+            rowOffset(:,1)= s*d3b
+            colOffset(:,1)=0.0_dp
+            rowOffset(:,2)=-s*a1b+s*a2b
+            colOffset(:,2)= s*d3k
+            rowOffset(:,3)=-s*a1b+s*a2b+s*d2b
+            colOffset(:,3)=-s*a1k+s*a2k
+            rowOffset(:,4)= s*a2b
+            colOffset(:,4)=-s*a1k+s*a2k+s*d2k
+            rowOffset(:,5)= s*a2b+s*d1b
+            colOffset(:,5)= s*a2k
+            rowOffset(:,6)=0.0_dp
+            colOffset(:,6)= s*a2k+s*d1k
         case default
             error stop 'Invalid loop channel'
         end select
@@ -315,16 +359,21 @@ contains
         ! Each K.shift is an integer multiple of 2*pi, so chiPhase is unchanged.
         if(loop<1.or.loop>3) error stop 'Invalid averaged loop channel'
         if(sample<1.or.sample>nLoopSamples(loop)) error stop 'Invalid loop sample'
-        n1=0; n2=0
+        n1=0
+        n2=0
         if(loop==1.and.sample==2) then
-            n1=1; n2=1
+            n1=1
+            n2=1
         else if((loop==1.and.sample==3).or.(loop==2.and.sample==2)) then
-            n1=-1; n2=2
+            n1=-1
+            n2=2
         else if(loop==2.and.sample==3) then
-            n1=-2; n2=1
+            n1=-2
+            n2=1
         endif
         if(centerSublattice=='B') then
-            n1=-n1; n2=-n2
+            n1=-n1
+            n2=-n2
         endif
         rowShift=real(n1,dp)*layerVectors(:,1,braLayer)+real(n2,dp)*layerVectors(:,2,braLayer)
         colShift=real(n1,dp)*layerVectors(:,1,ketLayer)+real(n2,dp)*layerVectors(:,2,ketLayer)
@@ -337,7 +386,9 @@ contains
         integer(dp) :: lo,hi,j,candidateCell(2)
         real(dp) :: difference(2),fraction(2),residual(2),distance,bestDistance
         call SiteRange(layer,sublatticeIndex,lo,hi)
-        bestDistance=huge(1.0_dp); site=0; imageCell=0
+        bestDistance=huge(1.0_dp)
+        site=0
+        imageCell=0
         do j=lo,hi
             difference=target-coord_ref(j,1:2)
             fraction(1)=(t2(2)*difference(1)-t2(1)*difference(2))/cellDet
@@ -346,7 +397,9 @@ contains
             residual=difference-real(candidateCell(1),dp)*t1-real(candidateCell(2),dp)*t2
             distance=sqrt(dot_product(residual,residual))
             if(distance<bestDistance) then
-                bestDistance=distance; site=j; imageCell=candidateCell
+                bestDistance=distance
+                site=j
+                imageCell=candidateCell
             endif
         enddo
         if(bestDistance>geometryTolerance) then
@@ -356,64 +409,52 @@ contains
         endif
     end subroutine LocateReferenceSite
 
-    subroutine CacheLoopSites(centerIndex,directionIndex,braLayer,ketLayer,centerSublattice,rBra,rKet)
-        integer(dp), intent(in) :: centerIndex,directionIndex,braLayer,ketLayer
+    subroutine LoopChannels(braLayer,ketLayer,centerSublattice,rBra,rKet,values)
+        integer(dp), intent(in) :: braLayer,ketLayer
         character(1), intent(in) :: centerSublattice
         real(dp), intent(in) :: rBra(2),rKet(2)
         real(dp) :: rowOffset(2,6),colOffset(2,6),rowShift(2),colShift(2)
-        integer(dp) :: m,n,sample,edge,centerSub,braSub,ketSub,rowSite,colSite,rowCell(2),colCell(2),shift(2),index
+        integer(dp) :: m,n,sample,centerSub,braSub,ketSub,rowSite,colSite,rowCell(2),colCell(2),shift(2),index
+        complex(dp), intent(out) :: values(3)
+        complex(dp) :: overlap
         logical :: reverse
+
+        values=cmplx(0.0_dp,0.0_dp,dp)
         centerSub=1
         if(centerSublattice=='B') centerSub=2
         do m=1,3
             call LoopOffsets(centerSublattice,braLayer,ketLayer,m,rowOffset,colOffset)
             do sample=1,nLoopSamples(m)
-            call LoopAverageShift(centerSublattice,braLayer,ketLayer,m,sample,rowShift,colShift)
-            do n=1,6
-                braSub=centerSub
-                if(mod(n,2_dp)==1) braSub=3-centerSub
-                ketSub=3-braSub
-                call LocateReferenceSite(rBra+rowOffset(:,n)+rowShift,braLayer,braSub,rowSite,rowCell)
-                call LocateReferenceSite(rKet+colOffset(:,n)+colShift,ketLayer,ketSub,colSite,colCell)
-                shift=rowCell-colCell
-                call FindFockCell(shift(1),shift(2),index)
-                reverse=(index<1)
-                if(reverse) call FindFockCell(-shift(1),-shift(2),index)
-                if(index<1) then
-                    write(*,*) 'Required Fock translation is outside Setup numI:',shift
-                    error stop 1
-                endif
-                edge=6*(sample-1)+n
-                rowSites(edge,m,directionIndex,centerIndex)=rowSite
-                colSites(edge,m,directionIndex,centerIndex)=colSite
-                fockCells(edge,m,directionIndex,centerIndex)=index
-                reverseCells(edge,m,directionIndex,centerIndex)=reverse
-            enddo
-            enddo
-        enddo
-    end subroutine CacheLoopSites
-
-    subroutine CachedLoopChannels(centerIndex,directionIndex,values)
-        integer(dp), intent(in) :: centerIndex,directionIndex
-        complex(dp), intent(out) :: values(3)
-        integer(dp) :: m,n,rowSite,colSite,index
-        complex(dp) :: overlap
-        values=cmplx(0.0_dp,0.0_dp,dp)
-        do m=1,3
-            do n=1,6*nLoopSamples(m)
-                rowSite=rowSites(n,m,directionIndex,centerIndex)
-                colSite=colSites(n,m,directionIndex,centerIndex)
-                index=fockCells(n,m,directionIndex,centerIndex)
-                if(reverseCells(n,m,directionIndex,centerIndex)) then
-                    overlap=conjg(zFock(colSite,rowSite,index,nspin))
-                else
-                    overlap=zFock(rowSite,colSite,index,nspin)
-                endif
-                values(m)=values(m)+overlap
+                call LoopAverageShift(centerSublattice,braLayer,ketLayer,m,sample,rowShift,colShift)
+                do n=1,6
+                    braSub=centerSub
+                    if(mod(n,2_dp)==1) braSub=3-centerSub
+                    ketSub=3-braSub
+                    call LocateReferenceSite(rBra+rowOffset(:,n)+rowShift,braLayer,braSub,rowSite,rowCell)
+                    call LocateReferenceSite(rKet+colOffset(:,n)+colShift,ketLayer,ketSub,colSite,colCell)
+                    shift=rowCell-colCell
+                    call FindFockCell(shift(1),shift(2),index)
+                    reverse=(index<1)
+                    if(reverse) call FindFockCell(-shift(1),-shift(2),index)
+                    if(index<1) then
+                        write(*,*) 'Required Fock translation is outside Setup numI:',shift
+                        error stop 1
+                    endif
+                    ! zFock(i,j,R) stores the overlap from j to the translated i.
+                    ! The opposite cell is obtained by Hermitian conjugation.
+                    if(.not.checkGeometry) then
+                        if(reverse) then
+                            overlap=conjg(zFock(colSite,rowSite,index,nspin))
+                        else
+                            overlap=zFock(rowSite,colSite,index,nspin)
+                        endif
+                        values(m)=values(m)+overlap
+                    endif
+                enddo
             enddo
             values(m)=values(m)/real(nLoopSamples(m),dp)
         enddo
-    end subroutine CachedLoopChannels
+    end subroutine LoopChannels
 
     subroutine ProjectLayerChannels(loops21,loops12,centerSublattice,chi,products)
         complex(dp), intent(in) :: loops21(3),loops12(3),chi
@@ -421,9 +462,11 @@ contains
         complex(dp), intent(out) :: products(4)
         complex(dp), parameter :: omega=cmplx(-0.5_dp,sqrt(3.0_dp)/2.0_dp,dp)
         complex(dp) :: ordered21(3),ordered12(3),a21,b21,a12,b12,prefactor
-        ordered21=loops21; ordered12=loops12
+        ordered21=loops21
+        ordered12=loops12
         if(centerSublattice=='B') then
-            ordered21=loops21([1,3,2]); ordered12=loops12([1,3,2])
+            ordered21=loops21([1,3,2])
+            ordered12=loops12([1,3,2])
         endif
         a21=(omega*ordered21(1)+ordered21(2)+conjg(omega)*ordered21(3))/3.0_dp
         b21=(conjg(omega)*ordered21(1)+ordered21(2)+omega*ordered21(3))/3.0_dp
