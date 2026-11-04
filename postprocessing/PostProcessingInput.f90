@@ -21,8 +21,10 @@ subroutine BuildGeometry(Coords, t1, t2, t3, g1, g12, RotMatrix, ReferenceCoords
     g12 = (4.0_dp*pi/3.0_dp)/aMoire*(real(3*ntheta+2,dp)*a2-a1)
     cs = 1.0_dp-1.0_dp/(2.0_dp*aMoire)
     sn = sqrt(1.0_dp-cs**2)
-    RotMatrix = reshape([cos(0.5_dp*acos(cs)),-sin(0.5_dp*acos(cs)), &
-        sin(0.5_dp*acos(cs)),cos(0.5_dp*acos(cs))],[2,2])
+    RotMatrix(1,1) = cos(0.5_dp*acos(cs))
+    RotMatrix(1,2) = sin(0.5_dp*acos(cs))
+    RotMatrix(2,1) = -sin(0.5_dp*acos(cs))
+    RotMatrix(2,2) = cos(0.5_dp*acos(cs))
     g1 = matmul(RotMatrix,g1)
     g12 = matmul(RotMatrix,g12)
 
@@ -91,36 +93,39 @@ subroutine ReadFock(zFock, numNeighborCells, suffix)
             error stop 1
         endif
 
+        ! Central cell: the producer writes the lower triangle, including i=j.
         rcc = 0
         do i=1,ndim
-            do j=1,i-1
-                call NextRecord()
+            do j=1,i
+                rcc = rcc+1
+                read(unit,rec=rcc,iostat=stat,iomsg=message) zinput
+                if(stat /= 0) then
+                    write(error_unit,'(A)') 'Fock read failed in '//filename//': '//trim(message)
+                    write(error_unit,*) 'Record:', rcc
+                    error stop 1
+                endif
                 zFock(i,j,1,nspin) = zinput
-                zFock(j,i,1,nspin) = conjg(zinput)
+                if(j<i) zFock(j,i,1,nspin) = conjg(zinput)
             enddo
-            call NextRecord()
-            zFock(i,i,1,nspin) = zinput
         enddo
+
+        ! Other cells: the producer writes every matrix element.
         do m=2,numNeighborCells
             do i=1,ndim
                 do j=1,ndim
-                    call NextRecord()
+                    rcc = rcc+1
+                    read(unit,rec=rcc,iostat=stat,iomsg=message) zinput
+                    if(stat /= 0) then
+                        write(error_unit,'(A)') 'Fock read failed in '//filename//': '//trim(message)
+                        write(error_unit,*) 'Record:', rcc
+                        error stop 1
+                    endif
                     zFock(i,j,m,nspin) = zinput
                 enddo
             enddo
         enddo
         close(unit)
     enddo
-contains
-    subroutine NextRecord()
-        rcc = rcc+1
-        read(unit,rec=rcc,iostat=stat,iomsg=message) zinput
-        if(stat /= 0) then
-            write(error_unit,'(A)') 'Fock read failed in '//filename//': '//trim(message)
-            write(error_unit,*) 'Record:', rcc
-            error stop 1
-        endif
-    end subroutine NextRecord
 end subroutine ReadFock
 
 subroutine ValidateResponseModel()
