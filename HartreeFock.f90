@@ -226,7 +226,8 @@ subroutine Solve_C3(zFockBulk,zFock,Potential,alpha,Bands,zEigenvectors,&
     do nband=nLower,nUpper
       zEigenvectors(:,nband-nLower+1,icountk)=zH_FockBulk1Temp(:,nband)
       
-      if ((icountk.ne.1).and.(icountk.ne.(numk/3*(numk+1)+1)).and.(icountk.ne.(2*numk/3*(numk+1)+1)))then
+      ! k is C_3-invariant when its C_3 image is itself: Gamma for any numk, K and K' only when 3 divides numk
+      if (C3_RelatedMomenta(icountk,2).ne.icountk)then
         
         if(fphase.eq.0)then
 
@@ -390,7 +391,7 @@ subroutine Solve_C3(zFockBulk,zFock,Potential,alpha,Bands,zEigenvectors,&
     enddo
 
     ! Add to zFockBulk. If the momentum is C_3-invariant we divide by 3 to conserve the number of states
-    if ((icountk.ne.1).and.(icountk.ne.(numk/3*(numk+1)+1)).and.(icountk.ne.(2*numk/3*(numk+1)+1)))then
+    if (C3_RelatedMomenta(icountk,2).ne.icountk)then
       zFockBulk=zFockBulk + zFockBulkTemp
     else
       zFockBulk=zFockBulk + zFockBulkTemp/3.0_dp
@@ -596,7 +597,8 @@ subroutine GetFock_C3(zFock,zSortedEigenvectors,ndim,RotateLayers,numb,numk,DegF
     icount= ivk1*numk + ivk2 + 1
 
     ! C_3 symmetry is respected on the contributions from C_3-non invariant points, after using Solve_C3
-    if((icount.ne.1).and.(icount.ne.(numk/3*(numk+1)+1)).and.(icount.ne.(2*numk/3*(numk+1)+1)))then
+    ! (ivk1,ivk2) is C_3-invariant when C_3: (ivk1,ivk2) -> (-ivk1-ivk2,ivk1) mod numk leaves it unchanged
+    if((modulo(-ivk1-ivk2,numk).ne.ivk1).or.(ivk1.ne.ivk2))then
 
       do i=1,ndim
         zP(i,1) = conjg(zSortedEigenvectors(i,nband)*exp(cmplx(0.0_dp,dot_product(vk,Coords(i,1:2))*real(fphase,dp),dp)))
@@ -632,7 +634,7 @@ subroutine GetFock_C3(zFock,zSortedEigenvectors,ndim,RotateLayers,numb,numk,DegF
     
     icount= ivk1*numk + ivk2 + 1
 
-    if((icount.ne.1).and.(icount.ne.(numk/3*(numk+1)+1)).and.(icount.ne.(2*numk/3*(numk+1)+1)))then
+    if((modulo(-ivk1-ivk2,numk).ne.ivk1).or.(ivk1.ne.ivk2))then
       
       do i=1,ndim
         zP(i,1) = conjg(zSortedEigenvectors(i,nband)*exp(cmplx(0.0_dp,dot_product(vk,Coords(i,1:2))*real(fphase,dp),dp)))
@@ -666,7 +668,7 @@ subroutine GetFock_C3(zFock,zSortedEigenvectors,ndim,RotateLayers,numb,numk,DegF
     icount= ivk1*numk + ivk2 + 1
 
     ! We enforce C_3 
-    if((icount.eq.1).or.(icount.eq.(numk/3*(numk+1)+1)).or.(icount.eq.(2*numk/3*(numk+1)+1)))then
+    if((modulo(-ivk1-ivk2,numk).eq.ivk1).and.(ivk1.eq.ivk2))then
 
       zFockTemp(:,:,:) = cmplx(0.0_dp,0.0_dp,dp)
       zFock1Temp(:,:) = cmplx(0.0_dp,0.0_dp,dp)
@@ -781,7 +783,7 @@ subroutine GetFock_C3(zFock,zSortedEigenvectors,ndim,RotateLayers,numb,numk,DegF
     icount= ivk1*numk + ivk2 + 1
 
     ! We enforce C_3 symmetry on the C_3-invariant points, similarly done in Solve_C3
-    if((icount.eq.1).or.(icount.eq.(numk/3*(numk+1)+1)).or.(icount.eq.(2*numk/3*(numk+1)+1)))then
+    if((modulo(-ivk1-ivk2,numk).eq.ivk1).and.(ivk1.eq.ivk2))then
 
       zFockTemp(:,:,:) = cmplx(0.0_dp,0.0_dp,dp)
       zFock1Temp(:,:) = cmplx(0.0_dp,0.0_dp,dp)
